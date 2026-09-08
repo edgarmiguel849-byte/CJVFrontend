@@ -1,0 +1,29 @@
+.ordenes-page {
+  max-width: 1250px;
+}
+
+.modal-backdrop-custom {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1050;
+}
+
+/*
+  ENTREGA RECORRIDA.
+
+  Los estilos de Angular van encerrados por componente: esta clase se usa
+  en la lista y en el modal de ESTA pantalla, así que tiene que estar
+  definida aquí. Si la fecha en rojo se necesita en otra pantalla, hay que
+  repetir el bloque en el CSS de aquella.
+
+  El !important es para el <input type="date">: Bootstrap le fija el color
+  en .form-control y sin esto la fecha del modal se queda negra.
+*/
+.entrega-recorrida {
+  color: #c1121f !important;
+  font-weight: 600;
+}

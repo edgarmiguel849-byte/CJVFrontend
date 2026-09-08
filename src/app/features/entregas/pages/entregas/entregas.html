@@ -1,0 +1,259 @@
+<div class="entregas-page">
+
+  <div class="card shadow-sm p-4">
+
+    <div class="mb-4">
+      <h2 class="fw-bold mb-1">Entregas</h2>
+      <p class="text-muted small mb-0">Registro de la entrega de paquetes a los alumnos.</p>
+    </div>
+
+    <div class="row g-3 align-items-end mb-4">
+      <div class="col-md-6">
+        <label class="form-label fw-semibold" for="idOrdenSeleccionada">Orden de Trabajo</label>
+        <select
+          id="idOrdenSeleccionada"
+          name="idOrdenSeleccionada"
+          class="form-select"
+          [(ngModel)]="idOrdenSeleccionada"
+          (change)="alCambiarOrden()">
+          <option [ngValue]="null" disabled>Selecciona una O.T....</option>
+          <option *ngFor="let ot of listaOrdenes" [ngValue]="ot.idOrdenTrabajo">
+            {{ formatearOT(ot) }} — {{ ot.carrera?.nombreCarrera }}
+            <span *ngIf="ot.grupo"> · Grupo {{ ot.grupo }}</span>
+          </option>
+        </select>
+      </div>
+
+      <div class="col-md-6" *ngIf="renglones.length > 0">
+        <label class="form-label fw-semibold">Buscar alumno</label>
+        <div class="input-group">
+          <span class="input-group-text bg-white border-end-0 text-muted">
+            <i class="fi fi-sr-search"></i>
+          </span>
+          <input
+            type="text"
+            class="form-control border-start-0"
+            placeholder="Nombre o folio..."
+            [(ngModel)]="criterioBusqueda" />
+        </div>
+      </div>
+    </div>
+
+    <div class="alert alert-danger py-2 small" *ngIf="error">
+      {{ error }}
+    </div>
+
+    <div *ngIf="cargando" class="text-center py-4 text-muted">
+      Cargando lista...
+    </div>
+
+    <div *ngIf="!cargando && renglones.length > 0">
+
+      <div class="row g-3 mb-3">
+        <div class="col-6 col-md-3">
+          <div class="border rounded p-3 h-100">
+            <div class="text-muted small">Alumnos</div>
+            <div class="fw-bold fs-4">{{ totalAlumnos() }}</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="border rounded p-3 h-100">
+            <div class="text-muted small">Entregados</div>
+            <div class="fw-bold fs-4 text-success">{{ totalEntregados() }}</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="border rounded p-3 h-100">
+            <div class="text-muted small">Pendientes</div>
+            <div class="fw-bold fs-4 text-primary">{{ totalPendientes() }}</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="border rounded p-3 h-100" [class.bg-warning-subtle]="totalConAdeudo() > 0">
+            <div class="text-muted small">Entregados debiendo</div>
+            <div class="fw-bold fs-4" [class.text-danger]="totalConAdeudo() > 0">
+              {{ totalConAdeudo() }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-check mb-3">
+        <input
+          class="form-check-input"
+          type="checkbox"
+          id="soloPendientes"
+          [(ngModel)]="soloPendientes" />
+        <label class="form-check-label" for="soloPendientes">
+          Ver solo los que faltan por entregar
+        </label>
+      </div>
+
+      <div class="table-responsive rounded border">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-dark">
+            <tr>
+              <th style="width: 5%;">#</th>
+              <th>Alumno</th>
+              <th>Folio</th>
+              <th class="text-end">Total</th>
+              <th class="text-end">Debe</th>
+              <th>Entrega</th>
+              <th class="text-center">Acción</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let r of renglonesFiltrados(); trackBy: trackByRenglon"
+                [class.table-danger]="estaCancelado(r)"
+                [class.table-success]="r.entregado && !estaCancelado(r)">
+
+              <td class="fw-bold text-secondary">{{ r.contrato?.numeroLista || '—' }}</td>
+
+              <td class="fw-semibold">
+                {{ r.contrato?.cliente?.nombreCompleto }}
+                <span *ngIf="estaCancelado(r)" class="badge bg-danger ms-1">Cancelado</span>
+              </td>
+
+              <td class="text-muted small">{{ r.contrato?.folio || '—' }}</td>
+
+              <td class="text-end">{{ r.contrato?.total | currency:'MXN':'symbol-narrow':'1.2-2' }}</td>
+
+              <td class="text-end fw-semibold" [ngClass]="debe(r) ? 'text-danger' : 'text-success'">
+                <span *ngIf="debe(r)">{{ r.resta | currency:'MXN':'symbol-narrow':'1.2-2' }}</span>
+                <span *ngIf="!debe(r)">Al corriente</span>
+              </td>
+
+              <td class="small">
+                <span *ngIf="!r.entregado" class="text-muted">Pendiente</span>
+                <div *ngIf="r.entregado">
+                  <div>
+                    {{ r.entrega?.fechaEntrega | date:'dd/MM/yyyy' }}
+                    <span class="text-muted">· {{ r.entrega?.usuario?.nombreUsuario }}</span>
+                  </div>
+                  <div *ngIf="r.entrega?.saldoAlEntregar > 0" class="text-danger fw-semibold">
+                    Debía {{ r.entrega?.saldoAlEntregar | currency:'MXN':'symbol-narrow':'1.2-2' }}
+                  </div>
+                  <div *ngIf="r.entrega?.comentarios" class="text-muted fst-italic">
+                    "{{ r.entrega?.comentarios }}"
+                  </div>
+                </div>
+              </td>
+
+              <td class="text-center">
+                <button
+                  *ngIf="puedeEntregar(r)"
+                  class="btn btn-sm btn-dark fw-semibold"
+                  [disabled]="guardando"
+                  (click)="abrirModal(r)">
+                  Entregar
+                </button>
+
+                <button
+                  *ngIf="r.entregado && esJefe"
+                  class="btn btn-sm btn-outline-secondary"
+                  [disabled]="guardando"
+                  (click)="deshacerEntrega(r)">
+                  Deshacer
+                </button>
+
+                <span *ngIf="estaCancelado(r) && !r.entregado" class="text-muted small">
+                  No aplica
+                </span>
+              </td>
+            </tr>
+
+            <tr *ngIf="renglonesFiltrados().length === 0">
+              <td colspan="7" class="text-center py-5 text-muted">
+                No hay alumnos que coincidan.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+
+    <div *ngIf="!cargando && idOrdenSeleccionada && renglones.length === 0 && !error"
+         class="text-center py-5 text-muted">
+      Esa orden de trabajo no tiene alumnos registrados.
+    </div>
+
+    <div *ngIf="!idOrdenSeleccionada" class="text-center py-5 text-muted">
+      Selecciona una orden de trabajo para ver su lista de alumnos.
+    </div>
+
+  </div>
+
+  <div
+    class="modal-backdrop-custom d-flex align-items-center justify-content-center"
+    *ngIf="mostrarModal"
+    (click)="cerrarModal()">
+
+    <div
+      class="card p-4 shadow-lg"
+      style="width: 100%; max-width: 520px;"
+      role="dialog"
+      aria-modal="true"
+      (click)="$event.stopPropagation()">
+
+      <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+        <h4 class="fw-bold mb-0">Registrar entrega</h4>
+        <button type="button" class="btn-close" aria-label="Cerrar" (click)="cerrarModal()"></button>
+      </div>
+
+      <div class="alert alert-danger py-2 small" *ngIf="error">
+        {{ error }}
+      </div>
+
+      <div class="mb-3">
+        <div class="text-muted small">Alumno</div>
+        <div class="fw-bold fs-5">{{ renglonSeleccionado?.contrato?.cliente?.nombreCompleto }}</div>
+        <div class="text-muted small">
+          Folio {{ renglonSeleccionado?.contrato?.folio || '—' }}
+          · Lugar #{{ renglonSeleccionado?.contrato?.numeroLista }}
+        </div>
+      </div>
+
+      <div class="alert py-2 mb-3"
+           [ngClass]="debe(renglonSeleccionado) ? 'alert-warning' : 'alert-success'">
+        <div *ngIf="debe(renglonSeleccionado)">
+          <strong>Este alumno debe
+            {{ renglonSeleccionado?.resta | currency:'MXN':'symbol-narrow':'1.2-2' }}</strong>
+          <div class="small mt-1">Explica por qué se le entrega de todos modos.</div>
+        </div>
+        <div *ngIf="!debe(renglonSeleccionado)">
+          <strong>Está al corriente.</strong>
+          <div class="small mt-1">Puede llevarse su paquete sin más.</div>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold" for="comentarioEntrega">
+          Comentario
+          <span class="text-danger" *ngIf="debe(renglonSeleccionado)">*</span>
+          <span class="text-muted fw-normal" *ngIf="!debe(renglonSeleccionado)">(opcional)</span>
+        </label>
+        <textarea
+          id="comentarioEntrega"
+          name="comentarioEntrega"
+          class="form-control"
+          rows="2"
+          placeholder="Ej. El jefe autorizó, paga el viernes"
+          [(ngModel)]="comentarioEntrega"></textarea>
+      </div>
+
+      <div class="d-flex gap-2 justify-content-end border-top pt-3">
+        <button type="button" class="btn btn-light px-4" (click)="cerrarModal()">Cancelar</button>
+        <button
+          type="button"
+          class="btn btn-dark px-4 fw-semibold"
+          [disabled]="!puedeConfirmar()"
+          (click)="confirmarEntrega()">
+          {{ guardando ? 'Guardando...' : 'Confirmar entrega' }}
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+</div>

@@ -1,0 +1,180 @@
+<div class="matriz-page">
+
+  <div *ngIf="cargando" class="text-center py-5 text-muted">
+    Cargando matriz...
+  </div>
+
+  <div *ngIf="error" class="alert alert-danger">
+    {{ error }}
+  </div>
+
+  <div *ngIf="matriz && !cargando" class="card shadow-sm p-4">
+
+    <!-- Encabezado tipo formato -->
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+      <div>
+        <!-- Los botones no van al papel: la clase no-imprimir los esconde. -->
+        <div class="d-flex gap-2 mb-3 no-imprimir">
+          <a routerLink="/ordenes-trabajo" class="btn btn-sm btn-outline-secondary">
+            <i class="fi fi-sr-arrow-left"></i> Volver
+          </a>
+          <button type="button" class="btn btn-sm btn-outline-dark" (click)="imprimir()">
+            <i class="fi fi-sr-print"></i> Imprimir
+          </button>
+        </div>
+
+        <div class="row-datos">
+          <!--
+            Escuela, carrera y vendedora viven DIRECTO en la O.T.:
+            escuela y carreraTexto son texto libre, y la vendedora es la
+            relación 'vendedor'. Antes esto colgaba de ordenTrabajo.carrera,
+            una relación que ya no existe, y por eso salía en blanco.
+          -->
+          <span><strong>Escuela:</strong> {{ matriz.ordenTrabajo.escuela || '—' }}</span>
+          <span><strong>Carrera:</strong> {{ matriz.ordenTrabajo.carreraTexto || '—' }}</span>
+          <span><strong>Generación:</strong> {{ matriz.ordenTrabajo.generacion || '—' }}</span>
+          <span><strong>Grupo:</strong> {{ matriz.ordenTrabajo.grupo || '—' }}</span>
+          <span><strong>Vendedora:</strong> {{ matriz.ordenTrabajo.vendedor?.nombre || '—' }}</span>
+          <span><strong>Entrega:</strong> {{ matriz.ordenTrabajo.fechaEntrega || '—' }}</span>
+        </div>
+      </div>
+      <div class="ot-badge">
+        <div class="ot-label">O.T.</div>
+        <div class="ot-numero">{{ numeroOT() }}</div>
+                <span class="badge mt-1" [ngClass]="cicloCerrado() ? 'bg-secondary' : 'bg-success'">
+          {{ cicloCerrado() ? 'Cerrado' : 'Abierto' }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Matriz -->
+    <div class="table-responsive rounded border">
+      <table class="table table-bordered table-sm mb-0 tabla-matriz">
+        <thead class="table-dark text-center align-middle">
+          <tr>
+            <th class="sticky-col col-orden">#</th>
+            <th class="sticky-col col-contrato">Contrato</th>
+            <th class="sticky-col col-nombre">Alumno</th>
+            <th>Anticipo</th>
+            <th *ngFor="let mes of matriz.meses">{{ mesCorto(mes) }}</th>
+            <th>Total</th>
+            <th>Abonado</th>
+            <th>Resta</th>
+          </tr>
+        </thead>
+        <tbody>
+                    <tr *ngFor="let fila of matriz.filas"
+              [class.fila-cancelada]="fila.cancelado"
+              [class.fila-traspasada]="fila.traspasadoA">
+            <td class="sticky-col col-orden text-center fw-bold">{{ fila.numeroLista || '—' }}</td>
+
+            <!--
+              Un cobro sin contrato (renta de toga) no tiene folio, y ahí el
+              guion largo confunde: parece un dato que falta por capturar.
+              Se dice con todas sus letras.
+            -->
+            <td class="sticky-col col-contrato fw-semibold text-secondary">
+              <span *ngIf="fila.folioContrato">{{ fila.folioContrato }}</span>
+              <span *ngIf="!fila.folioContrato" class="sin-folio"
+                    title="Cobro registrado sin contrato previo">
+                Sin folio de contrato
+              </span>
+            </td>
+
+            <td class="sticky-col col-nombre">
+              {{ nombreCompleto(fila) }}
+              <span class="badge badge-vencido ms-1" *ngIf="fila.vencido"
+                    title="Pasaron 4 meses del cierre de ciclo y aún tiene saldo">VENCIDO</span>
+                                  <span class="badge badge-traspasado ms-1" *ngIf="fila.traspasadoA"
+                    [title]="'Recontratado en el contrato ' + fila.traspasadoA">
+                ↗ {{ fila.traspasadoA }}
+              </span>
+            </td>
+
+            <td class="text-end">
+              <span *ngIf="fila.anticipo > 0">{{ fila.anticipo | currency:'MXN':'symbol-narrow' }}</span>
+              <span *ngIf="!fila.anticipo" class="text-muted">—</span>
+            </td>
+
+            <td *ngFor="let celda of fila.celdasPorMes" class="celda-mes text-end">
+              <ng-container *ngIf="celda.length > 0; else vacia">
+                <!--
+                  El rosa va PAGO POR PAGO, no en la celda ni en el renglón:
+                  un alumno puede tener dos pagos el mismo mes con uno
+                  marcado para Oficina y el otro no. Pintar la celda entera
+                  diría que todo el dinero se fue a Oficina.
+                -->
+                <div
+                  *ngFor="let pago of celda"
+                  class="pago-item"
+                  [class.pago-devolucion]="pago.monto < 0"
+                  [class.pago-oficina]="pago.comisionOficina"
+                  [class.pago-cortesia]="pago.cortesia"
+                  [title]="pago.monto < 0
+                    ? 'Devolución'
+                    : (pago.cortesia
+                        ? 'Cortesía: paquete regalado. No entró dinero al cajón.'
+                        : (pago.comisionOficina
+                            ? 'La comisión de este cobro se le acredita a Oficina al 10%'
+                            : ''))">
+                  <span class="folio">{{ pago.folio || 's/f' }}</span>
+                  <span class="monto">{{ pago.monto | currency:'MXN':'symbol-narrow' }}</span>
+                </div>
+              </ng-container>
+              <ng-template #vacia><span class="text-muted">—</span></ng-template>
+            </td>
+
+            <td class="text-end fw-semibold">{{ fila.total | currency:'MXN':'symbol-narrow' }}</td>
+            <td class="text-end text-success fw-semibold">{{ fila.abonado | currency:'MXN':'symbol-narrow' }}</td>
+            <td class="text-end" [ngClass]="claseResta(fila.resta)">
+              <div class="resta-texto">{{ textoResta(fila.resta) }}</div>
+              <div *ngIf="fila.resta !== 0">{{ (fila.resta < 0 ? -fila.resta : fila.resta) | currency:'MXN':'symbol-narrow' }}</div>
+            </td>
+          </tr>
+
+          <tr *ngIf="matriz.filas.length === 0">
+            <td [attr.colspan]="matriz.meses.length + 7" class="text-center py-4 text-muted">
+              Esta O.T. aún no tiene contratos vinculados.
+            </td>
+          </tr>
+        </tbody>
+        <tfoot class="table-light fw-bold">
+          <tr>
+            <td class="sticky-col col-orden"></td>
+            <td class="sticky-col col-contrato"></td>
+            <td class="sticky-col col-nombre text-end">TOTALES</td>
+            <td class="text-end">{{ matriz.totalAnticipos | currency:'MXN':'symbol-narrow' }}</td>
+            <td *ngFor="let tot of matriz.totalesPorMes" class="text-end" [class.text-danger]="tot < 0">
+              <span *ngIf="tot">{{ tot | currency:'MXN':'symbol-narrow' }}</span>
+              <span *ngIf="!tot" class="text-muted">—</span>
+            </td>
+            <td class="text-end">{{ matriz.totalGeneral | currency:'MXN':'symbol-narrow' }}</td>
+            <td class="text-end text-success">{{ matriz.abonadoGeneral | currency:'MXN':'symbol-narrow' }}</td>
+            <td class="text-end" [ngClass]="claseResta(matriz.restaGeneral)">
+              {{ (matriz.restaGeneral < 0 ? -matriz.restaGeneral : matriz.restaGeneral) | currency:'MXN':'symbol-narrow' }}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <!--
+      Pie de impresión. En pantalla no se ve (lo esconde solo-imprimir);
+      solo aparece en el papel.
+
+      Los montos de una matriz cambian cada semana. Sin esta marca, dentro
+      de tres meses nadie sabe si la hoja que trae alguien en la mano es de
+      hoy o de agosto.
+    -->
+    <div class="pie-impresion solo-imprimir" *ngIf="fechaImpresion">
+      <span>
+        O.T. {{ numeroOT() }} · {{ matriz.ordenTrabajo.escuela || '' }}
+        <span *ngIf="matriz.ordenTrabajo.grupo"> · Grupo {{ matriz.ordenTrabajo.grupo }}</span>
+      </span>
+      <span>
+        Impreso el {{ fechaImpresion | date:'dd/MM/yyyy' }} a las {{ fechaImpresion | date:'HH:mm' }}
+      </span>
+    </div>
+
+  </div>
+</div>

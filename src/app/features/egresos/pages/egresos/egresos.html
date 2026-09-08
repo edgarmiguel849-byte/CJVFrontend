@@ -1,0 +1,313 @@
+<div class="egresos-page">
+
+  <div class="card shadow-sm p-4">
+
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+      <div>
+        <h2 class="fw-bold mb-1">Egresos</h2>
+        <p class="text-muted small mb-0">Salidas de dinero de la caja: mano de obra, paquetería, devoluciones.</p>
+      </div>
+
+      <button *ngIf="puedeRegistrar()"
+              class="btn btn-dark d-flex align-items-center gap-2 fw-semibold px-4"
+              (click)="abrirFormulario()">
+        <i class="fi fi-sr-plus"></i> Nuevo Egreso
+      </button>
+    </div>
+
+    <!--
+      AVISOS DE MODO.
+
+      El banner permanente de SOLO_HOY se quitó: Mostrador ve solo hoy
+      TODOS los días, así que como letrero fijo era ruido. El contexto se
+      movió al mensaje de tabla vacía, que es donde de verdad hace falta:
+      cuando una búsqueda no encuentra nada y hay que explicar por qué.
+
+      Los otros dos avisos SÍ se quedan: en CORTE_CERRADO y SIN_ACCESO no
+      hay tabla ni botones, así que sin ellos la pantalla saldría en blanco
+      sin explicación.
+    -->
+    <div *ngIf="esModoCorteCerrado()" class="alert alert-warning py-2 small d-flex align-items-center gap-2">
+      <i class="fi fi-sr-lock"></i>
+      <span>
+        El <strong>corte de caja de hoy ya fue entregado</strong>. No puedes
+        registrar ni consultar egresos hasta que el jefe lo reabra.
+      </span>
+    </div>
+
+    <div *ngIf="esModoSinAcceso() && !cargandoModo" class="alert alert-secondary py-2 small">
+      Tu rol no tiene acceso a esta pantalla.
+    </div>
+
+    <div class="row g-2 mb-3" *ngIf="!esModoCorteCerrado() && !esModoSinAcceso()">
+      <div class="col-12 col-lg-5">
+        <label class="form-label small fw-semibold text-muted mb-1">Buscar</label>
+        <div class="input-group">
+          <span class="input-group-text bg-white border-end-0 text-muted">
+            <i class="fi fi-sr-search"></i>
+          </span>
+          <input
+            type="text"
+            class="form-control border-start-0"
+            placeholder="Concepto, comentario o usuario..."
+            aria-label="Buscar egresos"
+            [(ngModel)]="criterioBusqueda"
+            (input)="alEscribirBusqueda()" />
+        </div>
+      </div>
+
+      <!--
+        Desde/Hasta se esconden en SOLO_HOY: el servidor pisa esas fechas
+        de todos modos, así que teclear un rango no haría nada y parecería
+        que la pantalla está descompuesta.
+      -->
+      <div class="col-6 col-lg-3" *ngIf="puedeFiltrarPorFecha()">
+        <label class="form-label small fw-semibold text-muted mb-1" for="filtroDesde">Desde</label>
+        <input
+          id="filtroDesde"
+          type="date"
+          class="form-control"
+          [(ngModel)]="filtroDesde"
+          (change)="aplicarFiltros()" />
+      </div>
+
+      <div class="col-6 col-lg-3" *ngIf="puedeFiltrarPorFecha()">
+        <label class="form-label small fw-semibold text-muted mb-1" for="filtroHasta">Hasta</label>
+        <input
+          id="filtroHasta"
+          type="date"
+          class="form-control"
+          [(ngModel)]="filtroHasta"
+          (change)="aplicarFiltros()" />
+      </div>
+
+      <div class="col-12 col-lg-1 d-flex align-items-end">
+        <button
+          class="btn btn-outline-secondary w-100"
+          title="Limpiar filtros"
+          [disabled]="!hayFiltrosActivos()"
+          (click)="limpiarFiltros()">
+          <i class="fi fi-sr-cross-circle"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2"
+         *ngIf="!esModoCorteCerrado() && !esModoSinAcceso()">
+      <span class="text-muted small">{{ textoRango() }}</span>
+
+      <div class="d-flex align-items-center gap-2">
+        <label class="text-muted small mb-0" for="tamanioPagina">Por página:</label>
+        <select
+          id="tamanioPagina"
+          class="form-select form-select-sm"
+          style="width: auto;"
+          [(ngModel)]="tamanioPagina"
+          (change)="cambiarTamanio()">
+          <option *ngFor="let opcion of opcionesTamanio" [ngValue]="opcion">{{ opcion }}</option>
+        </select>
+      </div>
+    </div>
+
+    <div *ngIf="cargandoModo" class="text-center py-4 text-muted">
+      Cargando...
+    </div>
+
+    <div *ngIf="cargando && !cargandoModo" class="text-center py-4 text-muted">
+      Cargando egresos...
+    </div>
+
+    <div class="table-responsive rounded border"
+         *ngIf="!cargando && !cargandoModo && !esModoCorteCerrado() && !esModoSinAcceso()">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-dark">
+          <tr>
+            <th>Fecha</th>
+            <th>Concepto</th>
+            <th class="text-end">Monto</th>
+            <th>Registró</th>
+            <th class="text-center">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let egreso of listaEgresos; trackBy: trackByEgreso">
+            <td class="text-muted">{{ egreso.fechaEgreso | date:'dd/MM/yyyy' }}</td>
+
+            <td>
+              <div class="fw-semibold">{{ egreso.concepto }}</div>
+              <div class="small text-muted" *ngIf="egreso.comentarios">
+                {{ egreso.comentarios }}
+              </div>
+            </td>
+
+            <td class="text-end fw-semibold text-danger">
+              {{ egreso.monto | currency:'MXN':'symbol-narrow':'1.2-2' }}
+            </td>
+
+            <td class="text-muted">{{ egreso.usuario?.nombreUsuario || '—' }}</td>
+
+            <td class="text-center">
+              <div class="d-flex justify-content-center gap-2">
+                <button class="btn btn-sm btn-outline-primary" (click)="prepararEdicion(egreso)">Editar</button>
+                <button
+                  *ngIf="esJefe"
+                  class="btn btn-sm btn-outline-danger"
+                  (click)="eliminarEgreso(egreso.idEgreso)">Eliminar</button>
+              </div>
+            </td>
+          </tr>
+
+          <!--
+            El mensaje de tabla vacía cambia según el modo. Para Jefe/Admin
+            la pantalla arranca en blanco a propósito: decirle "no se
+            encontraron egresos" cuando todavía no ha buscado nada sería
+            mentira, y lo mandaría a revisar si algo se borró.
+          -->
+          <tr *ngIf="listaEgresos.length === 0 && esModoBuscarPrimero() && !hayFiltrosActivos()">
+            <td colspan="5" class="text-center py-5 text-muted">
+              Usa el buscador o elige una fecha para ver egresos.
+            </td>
+          </tr>
+
+          <tr *ngIf="listaEgresos.length === 0 && esModoSoloHoy() && !hayFiltrosActivos()">
+            <td colspan="5" class="text-center py-5 text-muted">
+              Todavía no hay egresos registrados hoy.
+            </td>
+          </tr>
+
+          <!--
+            Aquí es donde importa decir "de hoy": la búsqueda no encontró
+            nada y sin esta palabra parecería que el egreso se borró,
+            cuando lo que pasa es que es de otro día.
+          -->
+          <tr *ngIf="listaEgresos.length === 0 && esModoSoloHoy() && hayFiltrosActivos()">
+            <td colspan="5" class="text-center py-5 text-muted">
+              Ningún egreso <strong>de hoy</strong> coincide con la búsqueda.
+              Los de días anteriores los consulta el jefe.
+            </td>
+          </tr>
+
+          <tr *ngIf="listaEgresos.length === 0 && !(esModoBuscarPrimero() && !hayFiltrosActivos()) && !esModoSoloHoy()">
+            <td colspan="5" class="text-center py-5 text-muted">
+              No se encontraron egresos con esos filtros.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <nav class="d-flex justify-content-center mt-3" *ngIf="!cargando && totalPaginas > 1">
+      <ul class="pagination mb-0">
+        <li class="page-item" [class.disabled]="paginaActual === 0">
+          <button class="page-link" (click)="irAPagina(0)" title="Primera página">«</button>
+        </li>
+        <li class="page-item" [class.disabled]="paginaActual === 0">
+          <button class="page-link" (click)="paginaAnterior()">Anterior</button>
+        </li>
+
+        <li
+          class="page-item"
+          *ngFor="let numero of paginasVisibles()"
+          [class.active]="numero === paginaActual">
+          <button class="page-link" (click)="irAPagina(numero)">{{ numero + 1 }}</button>
+        </li>
+
+        <li class="page-item" [class.disabled]="paginaActual >= totalPaginas - 1">
+          <button class="page-link" (click)="paginaSiguiente()">Siguiente</button>
+        </li>
+        <li class="page-item" [class.disabled]="paginaActual >= totalPaginas - 1">
+          <button class="page-link" (click)="irAPagina(totalPaginas - 1)" title="Última página">»</button>
+        </li>
+      </ul>
+    </nav>
+
+  </div>
+
+  <div
+    class="modal-backdrop-custom d-flex align-items-center justify-content-center"
+    *ngIf="mostrarModal"
+    (click)="cerrarModal()">
+
+    <div
+      class="card p-4 shadow-lg"
+      style="width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto;"
+      role="dialog"
+      aria-modal="true"
+      (click)="$event.stopPropagation()">
+
+      <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+        <h4 class="fw-bold mb-0">{{ editando ? 'Editar Egreso' : 'Nuevo Egreso' }}</h4>
+        <button type="button" class="btn-close" aria-label="Cerrar" (click)="cerrarModal()"></button>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-12">
+          <label class="form-label fw-semibold" for="concepto">Concepto *</label>
+          <input
+            id="concepto"
+            name="concepto"
+            type="text"
+            class="form-control"
+            placeholder="Ej. M.O. Felipe, Paquetería, Devolución de contrato"
+            [(ngModel)]="nuevoEgreso.concepto" />
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold" for="monto">Monto *</label>
+          <input
+            id="monto"
+            name="monto"
+            type="number"
+            class="form-control"
+            step="0.01"
+            min="0.01"
+            [(ngModel)]="nuevoEgreso.monto" />
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold" for="fechaEgreso">Fecha *</label>
+          <input
+            id="fechaEgreso"
+            name="fechaEgreso"
+            type="date"
+            class="form-control"
+            [disabled]="fechaEgresoBloqueada()"
+            [(ngModel)]="nuevoEgreso.fechaEgreso" />
+          <!--
+            Esto es cortina: el campo deshabilitado se destraba desde el
+            inspector del navegador. La chapa está en guardarEgreso(), que
+            vuelve a forzar la fecha, y en EgresoService, que rechaza los
+            días con corte entregado.
+          -->
+          <div class="form-text" *ngIf="fechaEgresoBloqueada()">
+            Los egresos se registran con la fecha de hoy.
+          </div>
+        </div>
+
+        <div class="col-12">
+          <label class="form-label fw-semibold" for="comentarios">Comentarios</label>
+          <textarea
+            id="comentarios"
+            name="comentarios"
+            class="form-control"
+            rows="2"
+            placeholder="Notas adicionales (opcional)"
+            [(ngModel)]="nuevoEgreso.comentarios"></textarea>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 justify-content-end border-top pt-3 mt-4">
+        <button type="button" class="btn btn-light px-4" (click)="cerrarModal()">Cancelar</button>
+        <button
+          type="button"
+          class="btn btn-dark px-4 fw-semibold"
+          [disabled]="!formularioValido() || guardando"
+          (click)="guardarEgreso()">
+          {{ guardando ? 'Guardando...' : (editando ? 'Actualizar' : 'Guardar') }}
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+</div>

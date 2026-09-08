@@ -1,0 +1,605 @@
+<div class="contratos-adicionales-page">
+  <div class="card shadow-sm p-4">
+
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+      <div>
+        <h2 class="fw-bold mb-1">Contratos Adicionales</h2>
+        <p class="text-muted small mb-0">Ventas al público que no pertenecen a un grupo.</p>
+      </div>
+      <button
+        class="btn btn-dark d-flex align-items-center gap-2 fw-semibold px-4"
+        (click)="abrirFormulario()"
+        [disabled]="modoPantalla?.modo === 'CORTE_CERRADO' || modoPantalla?.modo === 'SIN_ACCESO'">
+        <i class="fi fi-sr-plus"></i> Nuevo contrato adicional
+      </button>
+    </div>
+
+    <div *ngIf="cargando" class="text-center py-4">
+      <div class="spinner-border spinner-border-sm text-secondary me-2" role="status">
+        <span class="visually-hidden">Cargando...</span>
+      </div>
+      <span class="text-muted">Cargando...</span>
+    </div>
+
+    <div *ngIf="!cargando">
+
+      <div class="alert alert-warning mb-4" *ngIf="modoPantalla?.modo === 'CORTE_CERRADO'">
+        <i class="fi fi-sr-info me-2"></i>
+        <strong>El corte de caja de hoy ya fue entregado.</strong>
+        <span class="d-block small mt-1">
+          Los contratos de hoy ya no se pueden ver ni modificar. Si necesitas corregir algo,
+          pídele al jefe que reabra el corte.
+        </span>
+      </div>
+
+      <div class="alert alert-danger mb-4" *ngIf="modoPantalla?.modo === 'SIN_ACCESO'">
+        <i class="fi fi-sr-cross-circle me-2"></i>
+        <strong>Tu rol no tiene acceso a esta pantalla.</strong>
+      </div>
+
+      <!-- Filtros de texto y fecha -->
+      <div class="row g-2 mb-3" *ngIf="modoPantalla?.modo !== 'CORTE_CERRADO' && modoPantalla?.modo !== 'SIN_ACCESO'">
+        <div class="col-12 col-lg-5">
+          <label class="form-label small fw-semibold text-muted mb-1">Buscar</label>
+          <div class="input-group">
+            <span class="input-group-text bg-white border-end-0 text-muted">
+              <i class="fi fi-sr-search"></i>
+            </span>
+            <input
+              type="text"
+              class="form-control border-start-0"
+              placeholder="Alumno, folio, carrera, escuela o estado..."
+              aria-label="Buscar adicionales"
+              [(ngModel)]="criterioBusqueda"
+              (input)="alEscribirBusqueda()"
+              [disabled]="modoPantalla?.modo === 'SOLO_HOY'" />
+          </div>
+        </div>
+
+        <div
+          class="col-6 col-lg-3"
+          *ngIf="modoPantalla?.modo !== 'SOLO_HOY'">
+          <label class="form-label small fw-semibold text-muted mb-1" for="filtroDesde">Desde</label>
+          <input id="filtroDesde" type="date" class="form-control"
+                 [(ngModel)]="filtroDesde" (change)="aplicarFiltros()" />
+        </div>
+        <div
+          class="col-6 col-lg-3"
+          *ngIf="modoPantalla?.modo !== 'SOLO_HOY'">
+          <label class="form-label small fw-semibold text-muted mb-1" for="filtroHasta">Hasta</label>
+          <input id="filtroHasta" type="date" class="form-control"
+                 [(ngModel)]="filtroHasta" (change)="aplicarFiltros()" />
+        </div>
+
+        <div
+          class="col-12 col-lg-1 d-flex align-items-end"
+          *ngIf="modoPantalla?.modo !== 'SOLO_HOY'">
+          <button class="btn btn-outline-secondary w-100" title="Limpiar filtros"
+                  [disabled]="!hayFiltrosActivos()" (click)="limpiarFiltros()">
+            <i class="fi fi-sr-cross-circle"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- La tabla de adicionales -->
+      <div class="table-responsive rounded border">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-dark">
+            <tr>
+              <th>Folio</th>
+              <th>O.T.</th>
+              <th>Ad</th>
+              <th>Alumno</th>
+              <th>Contacto</th>
+              <th>Escuela</th>
+              <th>Carrera</th>
+              <th>Fecha</th>
+              <th>Fecha entrega</th>
+              <th>Total</th>
+              <th>Anticipo</th>
+              <th>Abonado</th>
+              <th>Resta</th>
+              <th>Estado</th>
+              <th>Responsable</th>
+              <th class="text-center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of listaContratos; trackBy: trackByContrato">
+              <td class="fw-bold text-secondary">{{ item.contrato.folio || '—' }}</td>
+
+              <!-- O.T.: en adicionales siempre muestra fijo "AD". -->
+              <td><span class="badge bg-secondary">AD</span></td>
+
+              <!-- Ad: el dato manual que le sirve a producción. -->
+              <td class="text-muted small">{{ item.contrato.ad || '—' }}</td>
+
+              <td class="fw-semibold">{{ item.contrato.nombreAlumno || '—' }}</td>
+
+              <td class="text-muted small">
+                <div *ngIf="item.contrato.telefono1">{{ item.contrato.telefono1 }}</div>
+                <div *ngIf="item.contrato.telefono2">{{ item.contrato.telefono2 }}</div>
+                <div *ngIf="item.contrato.correo">{{ item.contrato.correo }}</div>
+                <span *ngIf="!item.contrato.telefono1 && !item.contrato.telefono2 && !item.contrato.correo">—</span>
+              </td>
+
+              <td class="text-muted small">{{ item.contrato.escuela || '—' }}</td>
+              <td class="text-muted small">{{ item.contrato.carrera || '—' }}</td>
+
+              <td class="text-muted">{{ item.contrato.fechaContrato | date:'dd/MM/yyyy' }}</td>
+              <td class="text-muted">{{ item.contrato.fechaEntrega ? (item.contrato.fechaEntrega | date:'dd/MM/yyyy') : '—' }}</td>
+
+              <td class="fw-semibold">{{ item.contrato.total | currency:'MXN':'symbol-narrow':'1.2-2' }}</td>
+
+              <td class="text-muted">
+                {{ item.contrato.anticipo | currency:'MXN':'symbol-narrow':'1.2-2' }}
+                <span
+                  *ngIf="item.contrato.anticipo > 0 && item.contrato.modoAnticipo !== 'Efectivo'"
+                  class="badge bg-warning text-dark ms-1"
+                  [title]="'Anticipo pagado por ' + item.contrato.modoAnticipo">
+                  {{ item.contrato.modoAnticipo }}
+                </span>
+                <span
+                  *ngIf="item.contrato.abonoHeredado > 0"
+                  class="badge bg-info text-dark ms-1"
+                  [title]="'Trae ' + (item.contrato.abonoHeredado | currency:'MXN':'symbol-narrow':'1.2-2') + ' de recibos anteriores. Ese dinero NO entró en la caja de este día.'">
+                  + arrastre
+                </span>
+              </td>
+
+              <td class="fw-semibold text-success">{{ item.abonado | currency:'MXN':'symbol-narrow':'1.2-2' }}</td>
+
+              <td class="fw-bold" [ngClass]="item.resta > 0 ? 'text-danger' : 'text-success'">
+                {{ item.resta | currency:'MXN':'symbol-narrow':'1.2-2' }}
+              </td>
+
+              <td>
+                <span class="badge"
+                  [ngClass]="claseEstado(item)"
+                  [title]="tituloEstado(item)">
+                  {{ textoEstado(item) }}
+                </span>
+              </td>
+
+              <td class="text-muted small">{{ item.contrato.usuario?.nombreUsuario || '—' }}</td>
+
+              <td class="text-center">
+                <div class="d-flex justify-content-center gap-2">
+                  <button *ngIf="puedeModificar(item)" class="btn btn-sm btn-outline-primary"
+                          (click)="prepararEdicion(item)">Editar</button>
+                  <button *ngIf="puedeModificar(item)" class="btn btn-sm btn-outline-danger"
+                          (click)="eliminarContrato(item.contrato.idContrato)">Eliminar</button>
+                  <span *ngIf="!puedeModificar(item)" class="text-muted small fst-italic"
+                        title="El día de este contrato ya tiene corte de caja generado">Cerrado</span>
+                </div>
+              </td>
+            </tr>
+
+            <tr *ngIf="listaContratos.length === 0">
+              <td colspan="16" class="text-center py-5 text-muted">
+                <div *ngIf="modoPantalla?.modo === 'SOLO_HOY'">No hay contratos adicionales registrados hoy.</div>
+                <div *ngIf="modoPantalla?.modo === 'BUSCAR_PRIMERO'">Usa el buscador o elige una fecha para ver adicionales.</div>
+                <div *ngIf="modoPantalla?.modo === 'SIN_ACCESO'">Tu rol no tiene acceso a esta pantalla.</div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pie de la tabla -->
+      <div *ngIf="modoPantalla?.modo !== 'CORTE_CERRADO' && modoPantalla?.modo !== 'SIN_ACCESO'" class="mt-2">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+          <span class="text-muted small">{{ textoRango() }}</span>
+          <div class="d-flex align-items-center gap-2">
+            <label class="text-muted small mb-0" for="tamanioPagina">Por página:</label>
+            <select id="tamanioPagina" class="form-select form-select-sm" style="width: auto;"
+                    [(ngModel)]="tamanioPagina" (change)="cambiarTamanio()">
+              <option *ngFor="let opcion of opcionesTamanio" [ngValue]="opcion">{{ opcion }}</option>
+            </select>
+          </div>
+        </div>
+
+        <nav class="d-flex justify-content-center" *ngIf="totalPaginas > 1">
+          <ul class="pagination mb-0">
+            <li class="page-item" [class.disabled]="paginaActual === 0">
+              <button class="page-link" (click)="irAPagina(0)" title="Primera página">«</button>
+            </li>
+            <li class="page-item" [class.disabled]="paginaActual === 0">
+              <button class="page-link" (click)="paginaAnterior()">Anterior</button>
+            </li>
+            <li class="page-item" *ngFor="let numero of paginasVisibles()" [class.active]="numero === paginaActual">
+              <button class="page-link" (click)="irAPagina(numero)">{{ numero + 1 }}</button>
+            </li>
+            <li class="page-item" [class.disabled]="paginaActual >= totalPaginas - 1">
+              <button class="page-link" (click)="paginaSiguiente()">Siguiente</button>
+            </li>
+            <li class="page-item" [class.disabled]="paginaActual >= totalPaginas - 1">
+              <button class="page-link" (click)="irAPagina(totalPaginas - 1)" title="Última página">»</button>
+            </li>
+          </ul>
+        </nav>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================= MODAL DE CONTRATO ADICIONAL ================= -->
+  <div class="modal-backdrop-custom d-flex align-items-center justify-content-center"
+       *ngIf="mostrarModal" (click)="cerrarModal()">
+      <div class="card p-4 shadow-lg modal-adicional"
+         role="dialog" aria-modal="true" (click)="$event.stopPropagation()">
+
+      <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+        <h4 class="fw-bold mb-0" [ngClass]="{ 'text-danger': modoFolioNoUtilizado }">
+          {{ editando
+              ? 'Editar Contrato Adicional'
+              : (modoFolioNoUtilizado
+                  ? 'Folio no utilizado'
+                  : (hayAnterior ? 'Recontratación de Contrato' : 'Nuevo Contrato Adicional')) }}
+        </h4>
+        <button type="button" class="btn-close" aria-label="Cerrar" (click)="cerrarModal()"></button>
+      </div>
+
+      <div class="alert alert-danger py-2 small" *ngIf="errorModal">{{ errorModal }}</div>
+
+      <!--
+        CASILLA "FOLIO NO UTILIZADO".
+
+        Va HASTA ARRIBA, antes de todo, porque es una decisión que se toma
+        al abrir el modal. Si estuviera abajo, alguien capturaría artículos
+        y al palomearla los perdería (el .ts limpia el formulario, porque
+        dejarlos visibles daría la impresión de que sí se mandan).
+
+        Esconde el interruptor de recontratación de abajo: un folio muerto
+        no tiene contrato anterior que arrastrar. El .ts además lo apaga en
+        las dos direcciones, para que ese estado imposible no exista ni
+        aunque alguien cambie esta plantilla.
+      -->
+      <div class="border rounded p-3 mb-3"
+           *ngIf="!editando"
+           [ngClass]="modoFolioNoUtilizado ? 'border-danger bg-danger-subtle' : 'bg-light'">
+        <div class="form-check mb-0">
+          <input class="form-check-input"
+                 type="checkbox"
+                 id="modoFolioNoUtilizado"
+                 name="modoFolioNoUtilizado"
+                 [(ngModel)]="modoFolioNoUtilizado"
+                 (ngModelChange)="alCambiarModoFolio()" />
+          <label class="form-check-label fw-semibold"
+                 for="modoFolioNoUtilizado"
+                 [ngClass]="{ 'text-danger': modoFolioNoUtilizado }">
+            Contrato adicional sin cobro
+          </label>
+          <div class="form-text mb-0">
+            Para un folio del talonario que no funciona. Se guarda solo
+            el folio y la fecha.
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ 1. ¿Hay contrato anterior? (solo al crear) ============ -->
+      <div class="border rounded p-3 bg-light mb-3" *ngIf="!editando && !modoFolioNoUtilizado">
+        <label class="form-label fw-semibold mb-2 d-block">¿Hay contrato anterior?</label>
+        <div class="btn-group" role="group">
+          <button type="button" class="btn"
+                  [ngClass]="!hayAnterior ? 'btn-dark' : 'btn-outline-secondary'"
+                  (click)="elegirCaminoAnterior(false)">No (nuevo desde cero)</button>
+          <button type="button" class="btn"
+                  [ngClass]="hayAnterior ? 'btn-dark' : 'btn-outline-secondary'"
+                  (click)="elegirCaminoAnterior(true)">Sí (recontratación)</button>
+        </div>
+
+        <!-- Cuando SÍ hay anterior: buscar el folio viejo para heredar sus datos. -->
+        <div class="mt-3" *ngIf="hayAnterior">
+          <label class="form-label fw-semibold" for="folioAnt">Folio del contrato anterior</label>
+          <div class="input-group">
+            <input id="folioAnt" name="folioAnt" type="text" class="form-control"
+                   placeholder="Ej. A1234" [(ngModel)]="folioAnterior" [readonly]="anteriorEncontrado" />
+            <button class="btn btn-outline-primary" type="button"
+                    (click)="buscarAnterior()" [disabled]="buscandoAnterior || anteriorEncontrado">
+              {{ buscandoAnterior ? 'Buscando...' : 'Buscar' }}
+            </button>
+          </div>
+          <div class="form-text" *ngIf="!anteriorEncontrado">
+            Teclea el folio del contrato anterior y presiona Buscar. Sirven folios de grupo
+            y de adicionales, activos o vencidos. Los cancelados no se pueden recontratar.
+          </div>
+
+          <!-- Resumen del contrato anterior: solo informativo, no se edita. -->
+          <div class="border rounded bg-white p-3 mt-2" *ngIf="anteriorEncontrado">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <span class="badge bg-dark">{{ anteriorFolio }}</span>
+              <span class="badge" [ngClass]="anteriorEsGrupo ? 'bg-primary' : 'bg-secondary'">
+                {{ anteriorEsGrupo ? 'O.T. ' + anteriorOT : 'Adicional' }}
+              </span>
+            </div>
+
+            <div class="row g-2 small">
+              <div class="col-6">
+                <div class="text-muted">Total del contrato anterior</div>
+                <div class="fw-bold">{{ anteriorTotal | currency:'MXN':'symbol-narrow':'1.2-2' }}</div>
+              </div>
+              <div class="col-6">
+                <div class="text-muted">Lo que el sistema tiene abonado</div>
+                <div class="fw-bold text-success">{{ anteriorAbonado | currency:'MXN':'symbol-narrow':'1.2-2' }}</div>
+              </div>
+            </div>
+
+            <div class="form-text mt-2 mb-0">
+              Estos números son de referencia. El total nuevo sale de los artículos que
+              captures abajo, y el global de recibos anteriores se puede corregir.
+            </div>
+          </div>
+          <div class="alert alert-warning py-2 small mt-2 mb-0" *ngIf="avisoVencido">{{ avisoVencido }}</div>
+        </div>
+      </div>
+
+      <!--
+        ============ MOLDES REUTILIZABLES ============
+        El orden de los bloques cambia según el camino:
+          - Recontratación: primero el ALUMNO (para confirmar a quién se encontró),
+            luego los datos del contrato nuevo.
+          - Nuevo desde cero: primero el CONTRATO, luego el alumno.
+        Se definen una sola vez aquí y se acomodan más abajo.
+      -->
+
+      <ng-template #bloqueDatosContrato>
+                <div class="col-md-6">
+          <label class="form-label fw-semibold" for="folioA">Folio *</label>
+          <input id="folioA" name="folioA" type="text" class="form-control"
+                 placeholder="Ej. A1234" [(ngModel)]="nuevoContrato.folio"
+                 [readonly]="editando" />
+          <!-- La ayuda va DEBAJO de la casilla: si va arriba, empuja este
+               campo hacia abajo y queda desalineado con el de al lado. -->
+          <div class="form-text">
+            {{ editando ? 'El folio es fijo y no se puede cambiar.' : 'Una letra y cuatro números.' }}
+          </div>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold" for="fechaA">
+            {{ modoFolioNoUtilizado ? 'Fecha *' : 'Fecha del Contrato *' }}
+          </label>
+          <input id="fechaA" name="fechaA" type="date" class="form-control"
+                 [(ngModel)]="nuevoContrato.fechaContrato" />
+        </div>
+
+        <!-- 'Ad' y 'Fecha de entrega' no aplican a un folio muerto. -->
+        <div class="col-md-6" *ngIf="!modoFolioNoUtilizado">
+          <label class="form-label fw-semibold" for="adA">Ad</label>
+          <input id="adA" name="adA" type="text" class="form-control"
+                 placeholder="Dato para producción" [(ngModel)]="nuevoContrato.ad" />
+        </div>
+
+        <div class="col-md-6" *ngIf="!modoFolioNoUtilizado">
+          <label class="form-label fw-semibold" for="fentregaA">Fecha de entrega</label>
+          <input id="fentregaA" name="fentregaA" type="date" class="form-control"
+                 [(ngModel)]="nuevoContrato.fechaEntrega" />
+        </div>
+      </ng-template>
+
+      <ng-template #bloqueDatosAlumno>
+        <div class="col-12">
+          <label class="form-label fw-semibold" for="nombreA">Nombre del alumno *</label>
+          <input id="nombreA" name="nombreA" type="text" class="form-control"
+                 placeholder="Nombre completo del alumno" [(ngModel)]="nuevoContrato.nombreAlumno" />
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold" for="tel1A">Teléfono 1</label>
+          <input id="tel1A" name="tel1A" type="text" class="form-control"
+                 placeholder="Ej. 2291234567" [(ngModel)]="nuevoContrato.telefono1" />
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold" for="tel2A">Teléfono 2</label>
+          <input id="tel2A" name="tel2A" type="text" class="form-control"
+                 placeholder="Opcional" [(ngModel)]="nuevoContrato.telefono2" />
+        </div>
+
+        <div class="col-12">
+          <label class="form-label fw-semibold" for="correoA">Correo electrónico</label>
+          <input id="correoA" name="correoA" type="email" class="form-control"
+                 placeholder="Opcional" [(ngModel)]="nuevoContrato.correo" />
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold" for="escuelaA">Escuela</label>
+          <input id="escuelaA" name="escuelaA" type="text" class="form-control"
+                 placeholder="Ej. ITUG" [(ngModel)]="nuevoContrato.escuela" />
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold" for="carreraA">Carrera</label>
+          <input id="carreraA" name="carreraA" type="text" class="form-control"
+                 placeholder="Ej. Biología" [(ngModel)]="nuevoContrato.carrera" />
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold" for="generacionA">Generación</label>
+          <input id="generacionA" name="generacionA" type="text" class="form-control"
+                 placeholder="Ej. 2022-2026" [(ngModel)]="nuevoContrato.generacion" />
+        </div>
+        <div class="col-md-6">
+          <label class="form-label fw-semibold" for="estadoA">Estado *</label>
+          <select id="estadoA" name="estadoA" class="form-select"
+                  [(ngModel)]="nuevoContrato.idEstadoContrato">
+            <option [ngValue]="null" disabled>Selecciona un estado...</option>
+            <option *ngFor="let estado of listaEstados" [ngValue]="estado.idEstadoContrato">
+              {{ estado.nombreEstado }}
+            </option>
+          </select>
+        </div>
+      </ng-template>
+
+      <!-- ============ 2. Los datos, acomodados según el camino ============ -->
+      <div class="row g-3">
+        <!-- Folio muerto: solo el molde del contrato, y adentro de ese molde
+             solo quedan visibles folio y fecha. El del alumno no se arma. -->
+        <ng-container *ngIf="modoFolioNoUtilizado">
+          <ng-container [ngTemplateOutlet]="bloqueDatosContrato"></ng-container>
+        </ng-container>
+
+        <ng-container *ngIf="!modoFolioNoUtilizado && hayAnterior && !editando">
+          <ng-container [ngTemplateOutlet]="bloqueDatosAlumno"></ng-container>
+          <ng-container [ngTemplateOutlet]="bloqueDatosContrato"></ng-container>
+        </ng-container>
+
+        <ng-container *ngIf="!modoFolioNoUtilizado && !(hayAnterior && !editando)">
+          <ng-container [ngTemplateOutlet]="bloqueDatosContrato"></ng-container>
+          <ng-container [ngTemplateOutlet]="bloqueDatosAlumno"></ng-container>
+        </ng-container>
+      </div>
+
+      <!-- ============ 3. Ingresar Artículos Adquiridos ============ -->
+      <div class="border rounded p-3 mt-4" *ngIf="!modoFolioNoUtilizado">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="fw-bold mb-0">Ingresar Artículos Adquiridos</h6>
+          <span class="badge bg-secondary">{{ nuevoContrato.articulos.length }}</span>
+        </div>
+        <div class="form-text mb-3">
+          El total del contrato es la suma de estos renglones, por eso no se teclea aparte.
+        </div>
+
+        <div *ngIf="cargandoArticulos" class="text-muted small mb-2">
+          <div class="spinner-border spinner-border-sm me-2" role="status">
+            <span class="visually-hidden">Cargando...</span>
+          </div>
+          Cargando artículos...
+        </div>
+
+        <div class="row g-2 mb-1 d-none d-md-flex">
+          <div class="col-md-7"><label class="form-label small fw-semibold text-muted mb-0">Descripción del artículo</label></div>
+          <div class="col-md-4"><label class="form-label small fw-semibold text-muted mb-0">Monto</label></div>
+          <div class="col-md-1"></div>
+        </div>
+
+        <div class="row g-2 mb-2 align-items-center"
+             *ngFor="let art of nuevoContrato.articulos; let i = index; trackBy: trackByIndice">
+          <div class="col-12 col-md-7">
+            <input type="text" class="form-control" [name]="'artDesc' + i"
+                   placeholder="Ej. Anillo de graduación"
+                   [(ngModel)]="art.descripcion" />
+          </div>
+          <div class="col-8 col-md-4">
+            <div class="input-group">
+              <span class="input-group-text">$</span>
+              <input type="number" class="form-control" step="0.01" min="0"
+                     [name]="'artMonto' + i" placeholder="0.00"
+                     [(ngModel)]="art.monto" />
+            </div>
+          </div>
+          <div class="col-4 col-md-1 d-grid">
+            <button type="button" class="btn btn-outline-danger" title="Quitar este artículo"
+                    (click)="quitarArticulo(i)">
+              <i class="fi fi-sr-trash"></i>
+            </button>
+          </div>
+        </div>
+
+        <button type="button" class="btn btn-sm btn-outline-primary mt-1"
+                (click)="agregarArticulo()">
+          <i class="fi fi-sr-plus me-1"></i> Agregar artículo
+        </button>
+      </div>
+
+      <!-- ============ 4. Totales de la recontratación ============ -->
+      <div class="border rounded p-3 mt-3 bg-light" *ngIf="!modoFolioNoUtilizado">
+        <h6 class="fw-bold mb-3">Totales</h6>
+
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold" for="totalA">Total del Contrato Final</label>
+            <div class="input-group">
+              <span class="input-group-text">$</span>
+              <input id="totalA" type="text" class="form-control fw-bold bg-white"
+                     [value]="totalArticulos() | number:'1.2-2'" readonly />
+            </div>
+            <div class="form-text">Se calcula solo, sumando los artículos.</div>
+          </div>
+
+          <div class="col-md-6" *ngIf="mostrarGlobalRecibos()">
+            <label class="form-label fw-semibold" for="heredadoA">
+              Anticipo (Global de Recibos Físicos Anteriores)
+            </label>
+            <div class="input-group">
+              <span class="input-group-text">$</span>
+              <input id="heredadoA" name="heredadoA" type="number" class="form-control"
+                     step="0.01" min="0" [(ngModel)]="nuevoContrato.abonoHeredado" />
+            </div>
+            <div class="form-text">
+              Lo que ya pagó antes. <strong>No</strong> entra al corte de caja de hoy:
+              ese dinero se cobró y se comisionó en el contrato anterior.
+            </div>
+          </div>
+
+                    <!-- Anticipo y su forma de pago van juntos y en su propio renglón:
+               son la misma decisión, y así el Total queda solo arriba. El
+               div de ancho completo es un "salto de línea" que empuja estos
+               dos campos a un renglón nuevo. -->
+          <div class="col-12 p-0"></div>
+
+          <div class="col-md-6">
+            <label class="form-label fw-semibold" for="anticipoA">Anticipo de Hoy</label>
+            <div class="input-group">
+              <span class="input-group-text">$</span>
+              <input id="anticipoA" name="anticipoA" type="number" class="form-control"
+                     step="0.01" min="0" [(ngModel)]="nuevoContrato.anticipo" />
+            </div>
+            <div class="form-text">
+              Solo lo que el alumno entrega HOY. Este sí entra al corte del día. Puede ser 0.
+            </div>
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label fw-semibold" for="modoA">Modo del Anticipo</label>
+            <select id="modoA" name="modoA" class="form-select" [(ngModel)]="nuevoContrato.modoAnticipo">
+              <option *ngFor="let modo of modosPago" [ngValue]="modo">{{ modo }}</option>
+            </select>
+            <div class="form-text">Solo "Efectivo" cuenta como dinero en caja.</div>
+          </div>
+
+        <!-- Vista previa del saldo, para que se vea cómo va quedando. -->
+        <div class="d-flex flex-wrap gap-4 border-top pt-3 mt-3 small">
+          <div>
+            <div class="text-muted">Total</div>
+            <div class="fw-bold">{{ totalArticulos() | currency:'MXN':'symbol-narrow':'1.2-2' }}</div>
+          </div>
+          <div>
+            <div class="text-muted">Abonado</div>
+            <div class="fw-bold text-success">{{ abonadoPrevisto() | currency:'MXN':'symbol-narrow':'1.2-2' }}</div>
+          </div>
+          <div>
+            <div class="text-muted">Resta</div>
+            <div class="fw-bold" [ngClass]="restaPrevista() > 0 ? 'text-danger' : 'text-success'">
+              {{ restaPrevista() | currency:'MXN':'symbol-narrow':'1.2-2' }}
+            </div>
+          </div>
+        </div>
+
+        <div class="alert alert-warning py-2 small mt-3 mb-0" *ngIf="restaPrevista() < 0">
+          <i class="fi fi-sr-info me-1"></i>
+          Lo abonado es mayor que el total. Revisa los artículos o el global de recibos.
+        </div>
+        </div>
+      </div>
+
+      <!-- ============ 5. Observaciones ============ -->
+      <div class="mt-3" *ngIf="!modoFolioNoUtilizado">
+        <label class="form-label fw-semibold" for="obsA">Observaciones</label>
+        <textarea id="obsA" name="obsA" class="form-control" rows="2"
+                  placeholder="Notas adicionales (opcional)" [(ngModel)]="nuevoContrato.observaciones"></textarea>
+      </div>
+
+      <div class="alert alert-danger py-2 small mt-3 mb-0" *ngIf="modoFolioNoUtilizado">
+        Se guardará solo el folio y la fecha. Aparecerá en <strong>rojo</strong>
+        en el reporte de control de adicionales, y <strong>no</strong> saldrá
+        en esta lista porque no es un contrato.
+      </div>
+
+      <div class="d-flex gap-2 justify-content-end border-top pt-3 mt-4">
+        <button type="button" class="btn btn-light px-4" (click)="cerrarModal()">Cancelar</button>
+        <button type="button" class="btn btn-dark px-4 fw-semibold" (click)="guardarContrato()">{{ editando ? 'Actualizar' : (hayAnterior ? 'Guardar recontratación' : 'Guardar') }}</button>
+      </div>
+
+    </div>
+  </div>
+</div>

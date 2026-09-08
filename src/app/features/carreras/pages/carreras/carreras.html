@@ -1,0 +1,101 @@
+<div class="carreras-page">
+
+  <div class="card shadow-sm p-4">
+
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+      <div>
+        <h2 class="fw-bold mb-1">Catálogo de Carreras</h2>
+        <p class="text-muted small mb-0">Administra las carreras y la escuela a la que pertenecen.</p>
+      </div>
+
+      <button class="btn btn-dark d-flex align-items-center gap-2 fw-semibold px-4"
+        (click)="abrirFormulario()">
+        <i class="fi fi-sr-plus"></i> Agregar Carrera
+      </button>
+    </div>
+
+    <div class="mb-4">
+      <div class="input-group">
+        <span class="input-group-text bg-white border-end-0 text-muted">
+          <i class="fi fi-sr-search"></i>
+        </span>
+        <input type="text" class="form-control border-start-0"
+          placeholder="Buscar carrera por nombre o escuela..."
+          [(ngModel)]="criterioBusqueda" (input)="filtrarCarreras()" />
+      </div>
+    </div>
+
+    <div *ngIf="cargando" class="text-center py-4 text-muted">
+      Cargando carreras...
+    </div>
+
+    <div class="table-responsive rounded border" *ngIf="!cargando">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-dark">
+          <tr>
+            <th style="width: 10%;">ID</th>
+            <th style="width: 40%;">Nombre de la Carrera</th>
+            <th style="width: 30%;">Escuela</th>
+            <th style="width: 20%; text-align: center;">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let carrera of carrerasFiltradas">
+            <td class="fw-bold text-secondary">#{{ carrera.idCarrera }}</td>
+            <td class="fw-semibold">{{ carrera.nombreCarrera }}</td>
+            <td class="text-muted">{{ carrera.escuela?.nombreEscuela }}</td>
+            <td style="text-align: center;">
+              <div class="d-flex justify-content-center gap-2">
+                <button class="btn btn-sm btn-outline-primary" (click)="prepararEdicion(carrera)">
+                  Editar
+                </button>
+                <button class="btn btn-sm btn-outline-danger" (click)="eliminarCarrera(carrera.idCarrera)">
+                  Eliminar
+                </button>
+              </div>
+            </td>
+          </tr>
+          <tr *ngIf="carrerasFiltradas.length === 0">
+            <td colspan="4" class="text-center py-5 text-muted">
+              No se encontraron carreras registradas.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <div class="modal-backdrop-custom d-flex align-items-center justify-content-center" *ngIf="mostrarModal">
+    <div class="card p-4 shadow-lg" style="width: 100%; max-width: 480px;">
+      <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+        <h4 class="fw-bold mb-0">{{ editando ? 'Editar Carrera' : 'Registrar Carrera' }}</h4>
+        <button type="button" class="btn-close" (click)="cerrarModal()"></button>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Nombre de la Carrera</label>
+        <input type="text" [(ngModel)]="nuevaCarrera.nombreCarrera" name="nombreCarrera"
+          class="form-control" placeholder="Ej. Ingeniería en Sistemas" />
+      </div>
+
+      <div class="mb-4">
+        <label class="form-label fw-semibold">Escuela</label>
+        <select [(ngModel)]="nuevaCarrera.idEscuela" name="idEscuela" class="form-select">
+          <option [ngValue]="null" disabled>Selecciona una escuela...</option>
+          <option *ngFor="let escuela of listaEscuelas" [ngValue]="escuela.idEscuela">
+            {{ escuela.nombreEscuela }}
+          </option>
+        </select>
+      </div>
+
+      <div class="d-flex gap-2 justify-content-end border-top pt-3">
+        <button type="button" class="btn btn-light px-4" (click)="cerrarModal()">Cancelar</button>
+        <button type="button" class="btn btn-dark px-4 fw-semibold" (click)="guardarCarrera()">
+          {{ editando ? 'Actualizar' : 'Guardar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>

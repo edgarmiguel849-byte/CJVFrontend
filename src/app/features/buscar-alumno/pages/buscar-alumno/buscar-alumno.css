@@ -1,0 +1,62 @@
+.buscar-page {
+  max-width: 900px;
+}
+
+.resultado-card {
+  border: 1px solid #e0e3e8;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.resultado-card:hover {
+  border-color: #1e2a3a;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+.saldo-linea {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  align-items: baseline;
+  line-height: 1.5;
+}
+
+/* ===================== CONTRATO RECONTRATADO (morado) =====================
+
+   Mismos colores que la matriz de la O.T., a propósito: si en una pantalla
+   el morado significa "este contrato ya se recontrató", en la otra tiene
+   que significar lo mismo. Un color que cambia de significado según la
+   pantalla confunde más de lo que ayuda.
+
+   Van definidos aquí otra vez porque Angular encierra los estilos por
+   componente: lo que se escribe en el CSS de la matriz no llega hasta acá.
+
+   OJO: el contrato viejo NO está dado de baja. Sigue vivo y con su saldo;
+   el morado solo avisa que ya existe uno nuevo. */
+
+.resultado-card.resultado-traspasado {
+  background-color: #f3e8ff;
+  border-color: #c084fc;
+  color: #6b21a8;
+}
+
+/* Sin esto, al pasar el mouse la tarjeta recuperaría el borde oscuro
+   normal y por un momento dejaría de verse morada. */
+.resultado-card.resultado-traspasado:hover {
+  border-color: #7e22ce;
+  box-shadow: 0 2px 12px rgba(126, 34, 206, 0.18);
+}
+
+/* El nombre del alumno, en morado fuerte. */
+.resultado-card.resultado-traspasado h5 {
+  color: #6b21a8;
+}
+
+/* La insignia "↗ F9996". */
+.badge-traspasado {
+  background-color: #7e22ce;
+  color: #ffffff;
+}
+
+/* El aviso en palabras debajo de la escuela. */
+.texto-traspasado {
+  color: #6b21a8;
+}

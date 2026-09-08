@@ -1,0 +1,15 @@
+:host{
+
+    display:block;
+
+    width:260px;
+
+    background:#1e293b;
+
+    color:white;
+
+    min-height:100%;
+
+    padding:20px;
+
+}

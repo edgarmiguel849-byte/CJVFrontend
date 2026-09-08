@@ -1,0 +1,126 @@
+.matriz-adicionales-page {
+  padding: 1rem;
+}
+
+/* Tabla compacta, estilo hoja de cálculo */
+.matriz-tabla {
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.matriz-tabla th {
+  background-color: #212529;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-align: center;
+  vertical-align: middle;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.matriz-tabla td {
+  vertical-align: middle;
+  padding: 0.3rem 0.4rem;
+}
+
+/* Anchos sugeridos por columna */
+.col-num       { width: 40px; }
+.col-folio     { width: 80px; }
+.col-ad        { width: 70px; }
+.col-nombre    { min-width: 220px; white-space: normal; }
+.col-carrera   { min-width: 160px; white-space: normal; }
+.col-escuela   { min-width: 140px; white-space: normal; }
+.col-gen       { width: 90px; }
+.col-concepto  { min-width: 200px; white-space: normal; }
+.col-dinero    { width: 85px; }
+.col-folio-pago{ width: 70px; }
+.col-pct       { width: 60px; }
+
+.celda-concepto {
+  font-size: 0.7rem;
+  color: #555;
+}
+
+.celda-folio {
+  font-size: 0.7rem;
+  color: #666;
+  background-color: #fafafa;
+}
+
+/* Cancelado: renglón en rojo suave, como el Excel */
+.fila-cancelada {
+  background-color: #fdecea !important;
+}
+
+.fila-cancelada td {
+  color: #a12622;
+}
+
+.fila-totales td {
+  background-color: #f1f3f5;
+  border-top: 2px solid #212529;
+}
+
+.cursor-pointer {
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+
+/* ===================== HOJA DE IMPRESIÓN ===================== */
+@media print {
+  @page {
+    size: landscape;
+    margin: 8mm;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .titulo-impresion {
+    display: block !important;
+    margin-bottom: 8px;
+  }
+
+  .matriz-adicionales-page {
+    padding: 0;
+  }
+
+  .card {
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .matriz-tabla {
+    font-size: 0.6rem;
+  }
+
+  .matriz-tabla th {
+    background-color: #ddd !important;
+    color: #000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .fila-cancelada {
+    background-color: #f5d5d2 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .table-responsive {
+    overflow: visible !important;
+  }
+}
+
+/* Naranja del "Vencido": Bootstrap no trae uno, así que va aquí. */
+.badge-vencido {
+  background-color: #fd7e14;
+  color: #fff;
+}
+
+.texto-vencido {
+  color: #fd7e14;
+}

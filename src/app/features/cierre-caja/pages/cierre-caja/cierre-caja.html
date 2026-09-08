@@ -1,0 +1,534 @@
+<div class="cierre-caja-page">
+
+  <div class="card shadow-sm p-4">
+                                    
+    <div class="mb-4">              
+                                    
+                                    
+      <h2 class="fw-bold mb-1">Cierre de Caja</h2>
+      <p class="text-muted small mb-0">Control de contratos y recibos de oficina — corte del día.</p>
+    </div>
+
+    <div class="row g-3 align-items-end mb-4">
+      <div class="col-md-4">
+        <label class="form-label fw-semibold" for="fecha">Fecha del corte</label>
+        <input id="fecha" name="fecha" type="date" class="form-control" [(ngModel)]="fecha" />
+      </div>
+      <div class="col-md-8 d-flex gap-2">
+        <button class="btn btn-dark fw-semibold px-4" (click)="generar()">Generar</button>
+        <button class="btn btn-outline-secondary" (click)="irHoy()">Hoy</button>
+        <button
+          class="btn btn-outline-dark d-flex align-items-center gap-2"
+          *ngIf="puedeImprimir()"
+          (click)="imprimir()">
+          <i class="fi fi-sr-print"></i> Imprimir
+        </button>
+      </div>
+    </div>
+
+    <div class="alert alert-danger py-2 small" *ngIf="error">
+      {{ error }}
+    </div>
+
+    <div *ngIf="cargando" class="text-center py-4 text-muted">
+      Generando corte...
+    </div>
+
+    <div *ngIf="!cargando && corte">
+
+      <div class="alert d-flex flex-wrap justify-content-between align-items-center gap-2"
+           *ngIf="estaCerrado()"
+           [ngClass]="estaAutorizado() ? 'alert-success' : 'alert-warning'">
+        <div>
+          <strong *ngIf="estaAutorizado()">Cierre autorizado</strong>
+          <strong *ngIf="estaEnviado()">Cierre enviado, pendiente de autorizar</strong>
+          <div class="small mt-1">
+            Enviado por {{ cierreGuardado.usuario?.nombreUsuario }}
+            <span *ngIf="estaAutorizado()">
+              · Autorizado por {{ cierreGuardado.usuarioAutoriza?.nombreUsuario }}
+              el {{ cierreGuardado.fechaAutorizacion | date:'dd/MM/yyyy HH:mm' }}
+            </span>
+          </div>
+        </div>
+
+        <div class="d-flex gap-2">
+          <button
+            class="btn btn-success btn-sm fw-semibold"
+            *ngIf="estaEnviado() && esJefe"
+            [disabled]="guardando"
+            (click)="autorizarCierre()">
+            Autorizar
+          </button>
+          <button
+            class="btn btn-outline-secondary btn-sm"
+            *ngIf="estaAutorizado() && esJefe"
+            [disabled]="guardando"
+            (click)="reabrirCierre()">
+            Reabrir
+          </button>
+          <button
+            class="btn btn-outline-danger btn-sm"
+            *ngIf="estaEnviado() && esJefe"
+            [disabled]="guardando"
+            (click)="eliminarCierre()">
+            Eliminar
+          </button>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-4">
+        <div class="col-md-3">
+          <div class="border rounded p-3 h-100">
+            <div class="text-muted small">Ingresos del día</div>
+            <div class="fw-bold fs-5">{{ corte.ingresos?.totalCobrado | currency:'MXN':'symbol-narrow':'1.2-2' }}</div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="border rounded p-3 h-100">
+            <div class="text-muted small">Egresos</div>
+            <div class="fw-bold fs-5 text-danger">{{ corte.totalEgresos | currency:'MXN':'symbol-narrow':'1.2-2' }}</div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="border rounded p-3 h-100">
+            <div class="text-muted small">Números rojos (no efectivo)</div>
+            <div class="fw-bold fs-5 text-danger">{{ corte.ingresos?.totalNoEfectivo | currency:'MXN':'symbol-narrow':'1.2-2' }}</div>
+          </div>
+        </div>
+
+        <div class="col-md-3" *ngIf="hayCortesias()">
+          <div class="border rounded p-3 h-100">
+            <div class="text-muted small">Cortesías</div>
+            <div class="fw-bold fs-5" style="color: #b8860b;">
+              {{ totalCortesias() | currency:'MXN':'symbol-narrow':'1.2-2' }}
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-3">
+          <div class="border rounded p-3 h-100 bg-light">
+            <div class="text-muted small">Efectivo esperado en caja</div>
+            <div class="fw-bold fs-4" [class.text-success]="corte.efectivoEnCaja >= 0" [class.text-danger]="corte.efectivoEnCaja < 0">
+              {{ corte.efectivoEnCaja | currency:'MXN':'symbol-narrow':'1.2-2' }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h5 class="fw-bold mb-3">Contratos y recibos del día</h5>
+      <div class="table-responsive rounded border mb-4">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead class="table-dark">
+            <tr>
+              <th>Contrato</th>
+              <th>Recibo</th>
+              <th>Nombre</th>
+              <th>Escuela</th>
+              <th>Modalidad</th>
+              <th class="text-end" *ngFor="let col of columnas()">{{ col.nombre }}</th>
+              <th class="text-end" *ngIf="hayCortesias()" style="color: #f0d080;">Cortesías</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let r of corte.renglones" [class.table-secondary]="r.cancelado">
+              <td class="text-muted small">{{ r.folioContrato || '' }}</td>
+              <td class="fw-semibold text-secondary small">{{ r.folioRecibo || '' }}</td>
+              <td class="small">
+                {{ r.nombre }}
+                <span *ngIf="r.cancelado" class="badge bg-danger ms-1">Cancelado</span>
+              </td>
+              <td class="text-muted small">{{ r.escuela }}</td>
+              <td class="small">
+                <span
+                  class="badge"
+                  [ngClass]="r.esCortesia ? '' : (r.esEfectivo ? 'bg-success' : 'bg-danger')"
+                  [style.background-color]="r.esCortesia ? '#b8860b' : null">
+                  {{ r.modalidad }}
+                </span>
+                <span *ngIf="r.esDevolucion" class="badge bg-danger ms-1">
+                  Devolución
+                </span>
+              </td>
+              <td class="text-end small" *ngFor="let col of columnas()">
+                <span
+                  *ngIf="montoEnColumna(r, col) !== null"
+                  class="fw-semibold"
+                  [class.text-danger]="!r.esEfectivo || r.esDevolucion">
+                  {{ montoEnColumna(r, col) | currency:'MXN':'symbol-narrow':'1.2-2' }}
+                </span>
+              </td>
+              <td class="text-end small" *ngIf="hayCortesias()">
+                <span *ngIf="montoCortesia(r) !== null" class="fw-semibold" style="color: #b8860b;">
+                  {{ montoCortesia(r) | currency:'MXN':'symbol-narrow':'1.2-2' }}
+                </span>
+              </td>
+            </tr>
+
+            <tr *ngIf="!corte.renglones || corte.renglones.length === 0">
+              <td [attr.colspan]="5 + columnas().length + (hayCortesias() ? 1 : 0)" class="text-center py-4 text-muted">
+                No hubo movimientos este día.
+              </td>
+            </tr>
+          </tbody>
+          <tfoot *ngIf="corte.renglones && corte.renglones.length > 0">
+            <tr class="table-light fw-bold">
+              <td colspan="5">Sumatoria</td>
+              <td class="text-end" *ngFor="let col of columnas()">
+                {{ col.montoCobrado | currency:'MXN':'symbol-narrow':'1.2-2' }}
+              </td>
+              <td class="text-end" *ngIf="hayCortesias()" style="color: #b8860b;">
+                {{ totalCortesias() | currency:'MXN':'symbol-narrow':'1.2-2' }}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <h5 class="fw-bold mb-3">Ingresos por destinatario</h5>
+      <div class="table-responsive rounded border mb-4">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-dark">
+            <tr>
+              <th>Destinatario</th>
+              <th class="text-end">Cobrado</th>
+              <th class="text-center">%</th>
+              <th class="text-end">Comisión</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let fila of corte.ingresos?.filas" [class.table-warning]="esOficina(fila)">
+              <td class="fw-semibold">{{ fila.nombre }}</td>
+              <td class="text-end">{{ fila.montoCobrado | currency:'MXN':'symbol-narrow':'1.2-2' }}</td>
+              <td class="text-center text-muted">{{ fila.porcentaje }}%</td>
+              <td class="text-end fw-bold text-primary">{{ fila.comision | currency:'MXN':'symbol-narrow':'1.2-2' }}</td>
+            </tr>
+
+            <tr *ngIf="!corte.ingresos?.filas || corte.ingresos.filas.length === 0">
+              <td colspan="4" class="text-center py-4 text-muted">
+                No hubo ingresos este día.
+              </td>
+            </tr>
+          </tbody>
+          <tfoot *ngIf="corte.ingresos?.filas && corte.ingresos.filas.length > 0">
+            <tr class="table-light fw-bold">
+              <td>SUMATORIA</td>
+              <td class="text-end">{{ corte.ingresos.totalCobrado | currency:'MXN':'symbol-narrow':'1.2-2' }}</td>
+              <td></td>
+              <td class="text-end text-primary">{{ corte.ingresos.totalComisiones | currency:'MXN':'symbol-narrow':'1.2-2' }}</td>
+            </tr>
+            <tr *ngIf="hayCortesias()">
+              <td class="small" style="color: #b8860b;">Cortesías otorgadas (no comisionan)</td>
+              <td class="text-end fw-bold" style="color: #b8860b;">
+                {{ totalCortesias() | currency:'MXN':'symbol-narrow':'1.2-2' }}
+              </td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <h5 class="fw-bold mb-3">Egresos del día</h5>
+      <div class="table-responsive rounded border mb-4">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-dark">
+            <tr>
+              <th>Concepto</th>
+              <th>Registró</th>
+              <th class="text-end">Importe</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let egreso of corte.egresos">
+              <td>
+                <div class="fw-semibold">{{ egreso.concepto }}</div>
+                <div class="small text-muted" *ngIf="egreso.comentarios">{{ egreso.comentarios }}</div>
+              </td>
+              <td class="text-muted">{{ egreso.usuario?.nombreUsuario || '—' }}</td>
+              <td class="text-end fw-semibold text-danger">
+                {{ egreso.monto | currency:'MXN':'symbol-narrow':'1.2-2' }}
+              </td>
+            </tr>
+
+            <tr *ngIf="!corte.egresos || corte.egresos.length === 0">
+              <td colspan="3" class="text-center py-4 text-muted">
+                No hubo egresos este día.
+              </td>
+            </tr>
+          </tbody>
+          <tfoot *ngIf="corte.egresos && corte.egresos.length > 0">
+            <tr class="table-light fw-bold">
+              <td colspan="2">TOTAL EGRESOS</td>
+              <td class="text-end text-danger">{{ corte.totalEgresos | currency:'MXN':'symbol-narrow':'1.2-2' }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <h5 class="fw-bold mb-3">Arqueo físico</h5>
+
+      <div class="border rounded p-3 mb-3" *ngIf="!estaCerrado()">
+        <div class="row g-3 align-items-end">
+          <div class="col-md-4">
+            <label class="form-label fw-semibold" for="conteoFisico">Dinero contado en el cajón</label>
+            <input
+              id="conteoFisico"
+              name="conteoFisico"
+              type="number"
+              step="0.01"
+              class="form-control"
+              placeholder="0.00"
+              [(ngModel)]="conteoFisico" />
+          </div>
+          <div class="col-md-4">
+            <div class="text-muted small">Efectivo esperado</div>
+            <div class="fw-bold fs-5">{{ corte.efectivoEnCaja | currency:'MXN':'symbol-narrow':'1.2-2' }}</div>
+          </div>
+          <div class="col-md-4" *ngIf="diferencia() !== null">
+            <div class="text-muted small">Diferencia</div>
+            <div class="fw-bold fs-5" [ngClass]="claseDiferencia()">
+              {{ diferencia() | currency:'MXN':'symbol-narrow':'1.2-2' }}
+            </div>
+            <div class="small" [ngClass]="claseDiferencia()">{{ textoDiferencia() }}</div>
+          </div>
+        </div>
+
+        <div class="mt-3" *ngIf="hayDiferencia()">
+          <label class="form-label fw-semibold" for="comentarioCierre">
+            Explica la diferencia <span class="text-danger">*</span>
+          </label>
+          <textarea
+            id="comentarioCierre"
+            name="comentarioCierre"
+            class="form-control"
+            rows="2"
+            placeholder="Ej. Se le dio cambio de más a un cliente"
+            [(ngModel)]="comentarioCierre"></textarea>
+          <div class="form-text">Obligatorio cuando la caja no cuadra.</div>
+        </div>
+
+        <div class="mt-3" *ngIf="diferencia() === null">
+          <div class="form-text">Captura el dinero contado para poder cerrar el día.</div>
+        </div>
+
+        <div class="d-flex justify-content-end mt-3">
+          <button
+            class="btn btn-dark px-4 fw-semibold"
+            [disabled]="!puedeEnviar()"
+            (click)="enviarCierre()">
+            {{ guardando ? 'Enviando...' : 'Enviar cierre' }}
+          </button>
+        </div>
+      </div>
+
+      <div class="border rounded p-3 mb-3 bg-light" *ngIf="estaCerrado()">
+        <div class="row g-3">
+          <div class="col-md-3">
+            <div class="text-muted small">Efectivo esperado</div>
+            <div class="fw-bold fs-5">{{ cierreGuardado.efectivoEsperado | currency:'MXN':'symbol-narrow':'1.2-2' }}</div>
+          </div>
+          <div class="col-md-3">
+            <div class="text-muted small">Dinero contado</div>
+            <div class="fw-bold fs-5">{{ cierreGuardado.efectivoContado | currency:'MXN':'symbol-narrow':'1.2-2' }}</div>
+          </div>
+          <div class="col-md-3">
+            <div class="text-muted small">Diferencia</div>
+            <div class="fw-bold fs-5"
+                 [class.text-success]="cierreGuardado.diferencia == 0"
+                 [class.text-danger]="cierreGuardado.diferencia != 0">
+              {{ cierreGuardado.diferencia | currency:'MXN':'symbol-narrow':'1.2-2' }}
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="text-muted small">Estado</div>
+            <span class="badge fs-6" [ngClass]="estaAutorizado() ? 'bg-success' : 'bg-warning text-dark'">
+              {{ cierreGuardado.estado }}
+            </span>
+          </div>
+        </div>
+
+        <div class="mt-3" *ngIf="cierreGuardado.comentarios">
+          <div class="text-muted small">Comentario</div>
+          <div>{{ cierreGuardado.comentarios }}</div>
+        </div>
+      </div>
+
+    </div>
+
+    <div *ngIf="!cargando && !corte && !error && yaConsulto" class="text-center py-5 text-muted">
+      No hay datos para esta fecha.
+    </div>
+
+  </div>
+
+  <!-- ============================================================
+       HOJA DE IMPRESIÓN
+       No se ve en pantalla. Solo aparece al mandar imprimir.
+       ============================================================ -->
+  <div class="hoja-impresion" *ngIf="corte && estaCerrado()">
+
+    <div class="hoja-titulo">
+      <div class="hoja-marca">Reporte de Caja</div>
+    </div>
+
+    <div class="hoja-fecha">{{ fechaLarga() }}</div>
+
+    <div class="hoja-pendiente" *ngIf="estaEnviado()">
+      PENDIENTE DE AUTORIZAR
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 8%;">CONTRATO</th>
+          <th style="width: 8%;">RECIBO</th>
+          <th style="width: 12%;">MODALIDAD</th>
+          <th style="width: 24%;">NOMBRE</th>
+          <th style="width: 20%;">ESCUELA</th>
+          <th class="num" *ngFor="let col of columnas()">{{ col.nombre | uppercase }}</th>
+          <th class="num" *ngIf="hayCortesias()">CORTESÍA</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let r of corte.renglones" [class.fila-cancelada]="r.cancelado">
+          <td>{{ r.folioContrato || '' }}</td>
+          <td>{{ r.folioRecibo || '' }}</td>
+          <td style="font-weight: 600;"
+              [style.color]="r.esDevolucion ? '#c0392b' : (r.esCortesia ? '#b8860b' : (r.esEfectivo ? '#1a7f37' : '#0b5ed7'))">
+            {{ r.modalidad }}<span *ngIf="r.esDevolucion"> · Devolución</span>
+          </td>
+          <td>{{ r.nombre }}</td>
+          <td>{{ r.escuela }}</td>
+          <td class="num" *ngFor="let col of columnas()">
+            <span *ngIf="montoEnColumna(r, col) !== null">
+              {{ montoEnColumna(r, col) | number:'1.2-2' }}
+              <span *ngIf="!r.esEfectivo"> *</span>
+            </span>
+          </td>
+          <td class="num" *ngIf="hayCortesias()">
+            <span *ngIf="montoCortesia(r) !== null">
+              {{ montoCortesia(r) | number:'1.2-2' }}
+            </span>
+          </td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr class="fila-total">
+          <td colspan="5">SUMATORIA</td>
+          <td class="num" *ngFor="let col of columnas()">
+            {{ col.montoCobrado | number:'1.2-2' }}
+          </td>
+          <td class="num" *ngIf="hayCortesias()">
+            {{ totalCortesias() | number:'1.2-2' }}
+          </td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <div style="font-size: 8pt; margin-top: -2mm;">
+      * Cobrado por transferencia, tarjeta o depósito (no entró efectivo a la caja).
+    </div>
+
+    <div class="hoja-bloques">
+
+      <div class="hoja-bloque">
+        <h6> TABLA DE EGRESOS</h6>
+        <table>
+          <tbody>
+            <tr *ngFor="let egreso of corte.egresos">
+              <td>
+                {{ egreso.concepto }}
+              </td>
+              <td class="num" style="width: 25%; color: #c0392b;">{{ egreso.monto | number:'1.2-2' }}</td>
+            </tr>
+            <tr *ngIf="!corte.egresos || corte.egresos.length === 0">
+              <td colspan="2">Sin egresos este día.</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="fila-total">
+              <td>TOTAL DE EGRESOS</td>
+              <td class="num" style="color: #c0392b;">{{ totalEgresos() | number:'1.2-2' }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div class="hoja-bloque">
+        <h6>COMISIONES</h6>
+        <table>
+          <tbody>
+            <tr *ngFor="let fila of corte.ingresos?.filas">
+              <td>{{ fila.nombre }}</td>
+              <td class="num" style="width: 20%;">{{ fila.porcentaje }}%</td>
+              <td class="num" style="width: 25%;">{{ fila.comision | number:'1.2-2' }}</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="fila-total">
+              <td colspan="2">SUMA DE COMISIONES</td>
+              <td class="num">{{ totalComisiones() | number:'1.2-2' }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div class="hoja-bloque">
+        <h6>RESUMEN</h6>
+        <table>
+          <tbody>
+            <tr>
+              <td>Ingresos del día</td>
+              <td class="num" style="width: 35%;">{{ totalIngresos() | number:'1.2-2' }}</td>
+            </tr>
+            <tr>
+              <td>Efectivo</td>
+              <td class="num">{{ totalEfectivo() | number:'1.2-2' }}</td>
+            </tr>
+            <tr>
+              <td>Números rojos (Transferencias)</td>
+              <td class="num">{{ totalNoEfectivo() | number:'1.2-2' }}</td>
+            </tr>
+            <tr *ngIf="hayCortesias()">
+              <td>Cortesías otorgadas</td>
+              <td class="num">{{ totalCortesias() | number:'1.2-2' }}</td>
+            </tr>
+            <tr>
+              <td>Egresos</td>
+              <td class="num">– {{ totalEgresos() | number:'1.2-2' }}</td>
+            </tr>
+            <tr class="fila-total">
+              <td>EFECTIVO A ENTREGAR</td>
+              <td class="num">{{ cierreGuardado.efectivoEsperado | number:'1.2-2' }}</td>
+            </tr>
+            <tr>
+              <td>Dinero en caja</td>
+              <td class="num">{{ cierreGuardado.efectivoContado | number:'1.2-2' }}</td>
+            </tr>
+            <tr class="fila-total">
+              <td>DIFERENCIA</td>
+              <td class="num">{{ cierreGuardado.diferencia | number:'1.2-2' }}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div *ngIf="cierreGuardado.comentarios" style="font-size: 8pt; margin-top: 1mm;">
+          <strong>Observación:</strong> {{ cierreGuardado.comentarios }}
+        </div>
+      </div>
+
+    </div>
+
+    <div class="hoja-firmas">
+      <div class="hoja-firma">
+        <div class="hoja-firma-linea">ENTREGA</div>
+        <div class="hoja-firma-nombre">{{ cierreGuardado.usuario?.nombreUsuario }}</div>
+      </div>
+      <div class="hoja-firma" *ngIf="estaAutorizado()">
+        <div class="hoja-firma-linea">RECIBÍ</div>
+        <div class="hoja-firma-nombre">{{ cierreGuardado.usuarioAutoriza?.nombreUsuario }}</div>
+      </div>
+    </div>
+
+  </div>
+
+</div>

@@ -1,0 +1,118 @@
+<div class="usuarios-page">
+
+  <div class="card shadow-sm p-4">
+
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+      <div>
+        <h2 class="fw-bold mb-1">Usuarios</h2>
+        <p class="text-muted small mb-0">Administración de accesos, roles y comisiones.</p>
+      </div>
+      <button class="btn btn-dark d-flex align-items-center gap-2 fw-semibold px-4" (click)="abrirFormulario()">
+        <i class="fi fi-sr-plus"></i> Nuevo Usuario
+      </button>
+    </div>
+
+    <div class="mb-4">
+      <div class="input-group">
+        <span class="input-group-text bg-white border-end-0 text-muted">
+          <i class="fi fi-sr-search"></i>
+        </span>
+        <input type="text" class="form-control border-start-0" placeholder="Buscar por nombre, correo o rol..." [(ngModel)]="criterioBusqueda" (input)="filtrarUsuarios()" />
+      </div>
+    </div>
+
+    <div *ngIf="cargando" class="text-center py-4 text-muted">Cargando usuarios...</div>
+
+    <div class="table-responsive rounded border" *ngIf="!cargando">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-dark">
+          <tr>
+            <th>ID</th>
+            <th>Usuario</th>
+            <th>Correo</th>
+            <th>Rol</th>
+            <th>Comisión</th>
+            <th>Estado</th>
+            <th style="text-align: center;">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let usuario of usuariosFiltrados">
+            <td class="fw-bold text-secondary">#{{ usuario.idUsuario }}</td>
+            <td class="fw-semibold">{{ usuario.nombreUsuario }}</td>
+            <td class="text-muted">{{ usuario.correo }}</td>
+            <td><span class="badge bg-dark">{{ usuario.rol?.nombreRol }}</span></td>
+            <td class="text-muted">{{ usuario.porcentajeComision }}%</td>
+            <td>
+              <span class="badge" [class.bg-success]="usuario.activo" [class.bg-secondary]="!usuario.activo">{{ usuario.activo ? 'Activo' : 'Inactivo' }}</span>
+            </td>
+            <td style="text-align: center;">
+              <div class="d-flex justify-content-center gap-2">
+                <button class="btn btn-sm btn-outline-primary" (click)="prepararEdicion(usuario)">Editar</button>
+                <button class="btn btn-sm btn-outline-danger" (click)="eliminarUsuario(usuario.idUsuario)">Eliminar</button>
+              </div>
+            </td>
+          </tr>
+          <tr *ngIf="usuariosFiltrados.length === 0">
+            <td colspan="7" class="text-center py-5 text-muted">No se encontraron usuarios registrados.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <div class="modal-backdrop-custom d-flex align-items-center justify-content-center" *ngIf="mostrarModal">
+    <div class="card p-4 shadow-lg" style="width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto;">
+      <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+        <h4 class="fw-bold mb-0">{{ editando ? 'Editar Usuario' : 'Nuevo Usuario' }}</h4>
+        <button type="button" class="btn-close" (click)="cerrarModal()"></button>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Nombre de Usuario *</label>
+          <input type="text" [(ngModel)]="nuevoUsuario.nombreUsuario" name="nombreUsuario" class="form-control" placeholder="Ej. fsuarez" />
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Correo *</label>
+          <input type="email" [(ngModel)]="nuevoUsuario.correo" name="correo" class="form-control" placeholder="usuario@cjv.com" />
+        </div>
+
+        <div class="col-12">
+          <label class="form-label fw-semibold">Contraseña</label>
+          <input type="password" [(ngModel)]="nuevoUsuario.contrasena" name="contrasena" class="form-control" autocomplete="new-password" placeholder="Dejar vacío al editar para no cambiarla" />
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Rol *</label>
+          <select [(ngModel)]="nuevoUsuario.idRol" name="idRol" class="form-select">
+            <option [ngValue]="null" disabled>Selecciona un rol...</option>
+            <option *ngFor="let rol of listaRoles" [ngValue]="rol.idRol">{{ rol.nombreRol }}</option>
+          </select>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Comisión (%)</label>
+          <input type="number" [(ngModel)]="nuevoUsuario.porcentajeComision" name="porcentajeComision" class="form-control" step="0.01" min="0" max="100" />
+        </div>
+
+        <div class="col-12">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" [(ngModel)]="nuevoUsuario.activo" name="activo" id="activoCheck" />
+            <label class="form-check-label" for="activoCheck">Usuario activo (puede iniciar sesión)</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 justify-content-end border-top pt-3 mt-4">
+        <button type="button" class="btn btn-light px-4" (click)="cerrarModal()">Cancelar</button>
+        <button type="button" class="btn btn-dark px-4 fw-semibold" (click)="guardarUsuario()">
+          {{ editando ? 'Actualizar' : 'Guardar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>

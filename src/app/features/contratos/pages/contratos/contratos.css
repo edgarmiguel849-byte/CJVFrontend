@@ -1,0 +1,32 @@
+.contratos-page {
+  max-width: 1250px;
+}
+
+.modal-backdrop-custom {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1050;
+}
+
+/* ===================== CONTRATO RECONTRATADO =====================
+
+   La insignia morada "↗ F9996" que avisa que este contrato ya se
+   recontrató en otro folio. Mismos colores que la matriz de la O.T.
+   y que Buscar Alumno, para que el morado signifique lo mismo en
+   todo el sistema.
+
+   Va definida aquí otra vez porque Angular encierra los estilos por
+   componente: lo que se escribe en el CSS de otra pantalla no llega
+   hasta esta.
+
+   OJO: aquí el renglón NO se pinta morado, solo la insignia. En esta
+   tabla hay muchas columnas y el renglón completo en color competía
+   con los montos de Abonado y Resta, que es lo que se lee primero. */
+.badge-traspasado {
+  background-color: #7e22ce;
+  color: #ffffff;
+}

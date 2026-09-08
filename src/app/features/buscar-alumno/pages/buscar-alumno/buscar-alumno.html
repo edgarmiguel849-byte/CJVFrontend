@@ -1,0 +1,143 @@
+<div class="buscar-page">
+
+  <div class="card shadow-sm p-4">
+
+    <div class="mb-4">
+      <h2 class="fw-bold mb-1">Buscar Alumno</h2>
+      <p class="text-muted small mb-0">Encuentra un alumno por su nombre o folio de contrato y consulta su orden de trabajo y saldo.</p>
+    </div>
+
+    <div class="mb-4">
+      <div class="input-group input-group-lg">
+        <span class="input-group-text bg-white border-end-0 text-muted">
+          <i class="fi fi-sr-search"></i>
+        </span>
+        <input type="text" class="form-control border-start-0"
+               placeholder="Escribe el nombre del alumno o el folio (ej. Magdalena, F-7001)..."
+               [(ngModel)]="criterio" (input)="alEscribir()" autofocus />
+      </div>
+      <div class="form-text">La búsqueda inicia automáticamente al escribir (mínimo 2 letras).</div>
+    </div>
+
+    <div *ngIf="buscando" class="text-center py-4 text-muted">
+      Buscando...
+    </div>
+
+    <div *ngIf="!buscando && yaBusco && resultados.length === 0" class="text-center py-5 text-muted">
+      No se encontraron alumnos que coincidan con "{{ criterio }}".
+    </div>
+
+    <div class="resultados" *ngIf="!buscando && resultados.length > 0">
+      <div class="text-muted small mb-2">{{ resultados.length }} resultado(s):</div>
+
+      <!-- La tarjeta se pinta MORADA cuando el contrato ya fue recontratado.
+           No hace falta un método en el .ts: 'traspasadoA' llega vacío en los
+           contratos normales y con el folio nuevo en los recontratados, así
+           que basta con preguntar si trae algo. -->
+      <div class="card resultado-card mb-3"
+           [class.resultado-traspasado]="r.contrato.traspasadoA"
+           *ngFor="let r of resultados">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+
+            <div>
+              <h5 class="fw-bold mb-1">{{ nombreCompleto(r.contrato) }}</h5>
+              <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+                <span class="badge bg-dark">{{ r.contrato.folio || 'Sin folio' }}</span>
+                <span class="badge" [ngClass]="r.contrato.ordenTrabajo ? 'bg-primary' : 'bg-secondary'">
+                  O.T. {{ formatearOT(r.contrato.ordenTrabajo) }}
+                </span>
+
+                                <!-- ESTADO del contrato: verde Activo / rojo Cancelado / naranja Vencido.
+                     "Vencido" NO vive en la base: se calcula en el componente,
+                     que decide el reloj según sea de grupo (cierre de ciclo)
+                     o adicional (fecha de entrega). -->
+                <span class="badge"
+                      [ngClass]="claseEstado(r)"
+                      [title]="tituloEstado(r)">
+                  {{ textoEstado(r) }}
+                </span>
+
+                <!-- RECONTRATADO: la flecha morada apunta al folio nuevo, el
+                     mismo distintivo que se usa en la matriz de la O.T. El
+                     contrato viejo SIGUE VIVO; esto solo avisa que ya existe
+                     uno nuevo, para que no se le cobre al equivocado. -->
+                <span *ngIf="r.contrato.traspasadoA"
+                      class="badge badge-traspasado"
+                      [title]="'Este contrato ya fue recontratado en el folio ' + r.contrato.traspasadoA + '. Los cobros nuevos van en ese contrato.'">
+                  ↗ {{ r.contrato.traspasadoA }}
+                </span>
+
+                <span *ngIf="r.contrato.numeroLista" class="text-muted small">Lugar #{{ r.contrato.numeroLista }}</span>
+              </div>
+
+              <!-- ESCUELA — CARRERA: ahora va PRIMERO la escuela y luego la carrera.
+                   El guion solo aparece cuando existen las dos partes, para que no
+                   quede un "— Biología" suelto si falta la escuela. -->
+              <div class="text-muted small" *ngIf="r.contrato.ordenTrabajo">
+                <span *ngIf="r.contrato.ordenTrabajo.escuela">{{ r.contrato.ordenTrabajo.escuela }}</span>
+                <span *ngIf="r.contrato.ordenTrabajo.escuela && r.contrato.ordenTrabajo.carreraTexto"> — </span>
+                <span *ngIf="r.contrato.ordenTrabajo.carreraTexto">{{ r.contrato.ordenTrabajo.carreraTexto }}</span>
+              </div>
+              <div class="text-muted small" *ngIf="!r.contrato.ordenTrabajo">
+                Venta al público (sin orden de trabajo)
+              </div>
+
+              <!-- Aviso en palabras, por si la insignia pasa desapercibida. -->
+              <div *ngIf="r.contrato.traspasadoA" class="mt-2 small texto-traspasado fw-semibold">
+                Recontratado en el folio {{ r.contrato.traspasadoA }} — los cobros nuevos van en ese contrato.
+              </div>
+
+              <!-- CONTACTO: teléfonos y correo (solo los que el alumno tenga capturados). -->
+              <div *ngIf="r.contrato.telefono1 || r.contrato.telefono2 || r.contrato.correo" class="mt-2 small">
+                <span class="fw-semibold">Contacto:</span>
+                <span *ngIf="r.contrato.telefono1" class="ms-1">Tel. {{ r.contrato.telefono1 }}</span>
+                <span *ngIf="r.contrato.telefono2" class="ms-2">Tel. {{ r.contrato.telefono2 }}</span>
+                <span *ngIf="r.contrato.correo" class="ms-2">{{ r.contrato.correo }}</span>
+              </div>
+
+              <!-- Observaciones: se muestran siempre que existan -->
+              <div *ngIf="r.contrato.observaciones" class="mt-2 small">
+                <span class="fw-semibold">Observaciones:</span>
+                {{ r.contrato.observaciones }}
+              </div>
+
+              <!-- Ad: solo para contratos adicionales (sin O.T.) -->
+              <div *ngIf="!r.contrato.ordenTrabajo && r.contrato.ad" class="mt-1 small">
+                <span class="fw-semibold">Ad:</span>
+                {{ r.contrato.ad }}
+              </div>
+            </div>
+
+            <div class="text-end">
+              <div class="saldo-linea">
+                <span class="text-muted small">Total:</span>
+                <span class="fw-semibold">{{ r.contrato.total | currency:'MXN':'symbol-narrow' }}</span>
+              </div>
+              <div class="saldo-linea">
+                <span class="text-muted small">Abonado:</span>
+                <span class="fw-semibold text-success">{{ r.abonado | currency:'MXN':'symbol-narrow' }}</span>
+              </div>
+              <div class="saldo-linea">
+                <span class="text-muted small">{{ textoResta(r.resta) }}:</span>
+                <span class="fw-bold" [ngClass]="claseResta(r.resta)">
+                  {{ (r.resta < 0 ? -r.resta : r.resta) | currency:'MXN':'symbol-narrow' }}
+                </span>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="mt-3 pt-3 border-top d-flex justify-content-end gap-2" *ngIf="r.contrato.ordenTrabajo">
+            <a class="btn btn-sm btn-outline-dark"
+               [routerLink]="['/ordenes-trabajo', r.contrato.ordenTrabajo.idOrdenTrabajo, 'matriz']">
+              Ver matriz de la O.T.
+            </a>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>

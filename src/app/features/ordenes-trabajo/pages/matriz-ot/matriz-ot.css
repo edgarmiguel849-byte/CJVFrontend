@@ -1,0 +1,332 @@
+.matriz-page {
+  max-width: 100%;
+}
+
+.row-datos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.5rem;
+  font-size: 0.9rem;
+}
+
+.ot-badge {
+  text-align: center;
+  border: 2px solid #1e2a3a;
+  border-radius: 10px;
+  padding: 0.5rem 1.25rem;
+  min-width: 120px;
+}
+.ot-label {
+  font-size: 0.8rem;
+  letter-spacing: 2px;
+  color: #6c757d;
+}
+.ot-numero {
+  font-size: 1.8rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #1e2a3a;
+}
+
+.tabla-matriz {
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+.tabla-matriz th {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.celda-mes {
+  min-width: 90px;
+}
+.pago-item {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+  padding: 1px 0;
+}
+.pago-item + .pago-item {
+  border-top: 1px dashed #dee2e6;
+  margin-top: 2px;
+  padding-top: 2px;
+}
+.pago-item .folio {
+  font-size: 0.65rem;
+  color: #6c757d;
+}
+.pago-item .monto {
+  font-weight: 600;
+}
+
+/* Rosa de Oficina: la comisión de ESE pago se le acredita a Oficina al 10%.
+   Son los mismos tonos de pagos.css, pero hay que repetirlos aquí porque
+   los estilos van encerrados por componente.
+
+   Va PAGO POR PAGO y no por celda ni por renglón: un alumno puede tener
+   dos pagos el mismo mes con uno marcado y el otro no.
+
+   OJO AL ORDEN: este bloque va ANTES del de devolución a propósito. Una
+   devolución también se puede marcar para Oficina, y con la misma
+   especificidad gana la regla de más abajo. Así el pago queda con fondo
+   rosa y números rojos: se ve que salió dinero Y que fue a Oficina. */
+.pago-item.pago-oficina {
+  background-color: #fce7f3;
+  border-left: 3px solid #f9a8d4;
+  border-radius: 3px;
+  padding-left: 4px;
+  padding-right: 3px;
+}
+.pago-item.pago-oficina .folio,
+.pago-item.pago-oficina .monto {
+  color: #9d174d;
+}
+
+/* CORTESÍA: paquete regalado. Va DESPUÉS de .pago-oficina y ANTES de
+   .pago-devolucion, y ese orden no es casual.
+
+   Con la misma especificidad gana la regla de más abajo, así que:
+   - Si un pago está marcado como Cortesía Y como Oficina (combinación
+     que la pantalla de Pagos hoy permite aunque no tenga sentido),
+     gana el dorado. Que no entró dinero es el dato más importante
+     de ese renglón; a quién se le acredita una comisión que no
+     existe, es lo de menos.
+   - Cortesía + devolución no puede ocurrir: pagos.ts saca "Cortesía"
+     de la lista de modos cuando el movimiento es una devolución. */
+.pago-item.pago-cortesia {
+  background-color: #fef3c7;
+  border-left: 3px solid #fcd34d;
+  border-radius: 3px;
+  padding-left: 4px;
+  padding-right: 3px;
+}
+.pago-item.pago-cortesia .folio,
+.pago-item.pago-cortesia .monto {
+  color: #92400e;
+}
+
+/* RN-11: una devolución es el único pago con monto negativo. */
+.pago-item.pago-devolucion .folio,
+.pago-item.pago-devolucion .monto {
+  color: #c0392b;
+}
+
+/* Cobro sin contrato: no hay folio y nunca lo va a haber. Se pone en
+   cursiva y apagado para que no parezca un dato pendiente de capturar. */
+.sin-folio {
+  font-style: italic;
+  font-weight: 400;
+  font-size: 0.7rem;
+  color: #adb5bd;
+  white-space: normal;
+}
+
+.resta-texto {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.fila-cancelada {
+  background-color: #f8d7da !important;
+  color: #842029;
+}
+.fila-cancelada td {
+  text-decoration: line-through;
+}
+
+/* Columnas fijas al hacer scroll horizontal */
+.sticky-col {
+  position: sticky;
+  background: #fff;
+  z-index: 2;
+}
+thead .sticky-col {
+  background: #212529;
+  z-index: 3;
+}
+.col-orden { left: 0; min-width: 45px; }
+.col-contrato { left: 45px; min-width: 90px; }
+.col-nombre { left: 135px; min-width: 180px; }
+
+/* Naranja del "Vencido": Bootstrap no trae uno, así que va aquí.
+   Mismo tono que en la matriz de adicionales, para que combinen. */
+.badge-vencido {
+  background-color: #fd7e14;
+  color: #fff;
+}
+
+/* Recontratado: renglón morado. El contrato sigue vivo y sumando,
+   pero su deuda ya se movió a otro folio. */
+.fila-traspasada {
+  background-color: #f3e8ff !important;
+}
+
+.fila-traspasada td {
+  color: #6b21a8;
+}
+
+.badge-traspasado {
+  background-color: #7e22ce;
+  color: #fff;
+}
+
+/* El pie con la fecha solo existe en el papel. */
+.solo-imprimir {
+  display: none;
+}
+
+/* =====================================================================
+   IMPRESIÓN
+   =====================================================================
+
+   Cómo debe salir: oficio horizontal, la tabla completa con sus doce
+   meses, los colores conservados y una marca de cuándo se imprimió.
+
+   OJO: el diálogo del navegador MANDA sobre este archivo. Si al dar
+   Ctrl+P el tamaño de papel dice "Carta", hay que cambiarlo a "Oficio"
+   ahí mismo. El CSS lo pide, no lo impone.
+   ===================================================================== */
+
+@page {
+  size: legal landscape;
+  margin: 8mm;
+}
+
+@media print {
+
+  /* Botones y adornos de pantalla: fuera del papel. */
+  .no-imprimir {
+    display: none !important;
+  }
+
+  .solo-imprimir {
+    display: flex !important;
+  }
+
+  /* La tarjeta es un recurso de pantalla. En papel solo estorba margen. */
+  .card {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+  }
+
+  /*
+    ESTE ES EL ARREGLO IMPORTANTE.
+
+    table-responsive esconde lo que no cabe detrás de una barra de scroll.
+    En papel no hay scroll, así que todo lo escondido simplemente NO SE
+    IMPRIME: por eso salían solo los primeros meses. Quitándole el
+    overflow, la tabla se despliega completa.
+  */
+  .table-responsive {
+    overflow: visible !important;
+    border: none !important;
+  }
+
+  /*
+    Las columnas fijas no significan nada en papel y encima se montan
+    sobre las de junto. Se sueltan.
+  */
+  .sticky-col {
+    position: static !important;
+  }
+
+  /*
+    Los navegadores NO imprimen fondos de color a menos que se les exija.
+    Sin esto, el rosa de Oficina, el morado del recontratado y el salmón
+    del cancelado salen en blanco y la hoja pierde toda su información
+    de color.
+  */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /*
+    Doce meses a 90px son 1080px solo de meses, y en oficio horizontal
+    caben unos 1280px contando TODAS las columnas. No alcanza. Se baja
+    la letra y se sueltan los anchos mínimos para que la tabla se
+    comprima sola.
+  */
+  .tabla-matriz {
+    font-size: 6.5pt !important;
+    width: 100% !important;
+    table-layout: auto !important;
+  }
+  .tabla-matriz th {
+    font-size: 5.5pt !important;
+    letter-spacing: 0 !important;
+  }
+  .tabla-matriz th,
+  .tabla-matriz td {
+    padding: 1px 2px !important;
+  }
+
+  .celda-mes {
+    min-width: 0 !important;
+  }
+  .col-orden { min-width: 0 !important; width: 3% !important; }
+  .col-contrato { min-width: 0 !important; width: 7% !important; }
+  .col-nombre {
+    min-width: 0 !important;
+    width: 13% !important;
+    white-space: normal !important;   /* que el nombre largo se acomode en dos renglones */
+  }
+
+  .pago-item .folio {
+    font-size: 5pt !important;
+  }
+  .resta-texto {
+    font-size: 5pt !important;
+  }
+
+  /* El encabezado oscuro consume mucha tinta. Se deja claro con letra
+     negra: se lee igual y no se acaba el cartucho. */
+  .tabla-matriz thead th,
+  thead .sticky-col {
+    background: #e9ecef !important;
+    color: #000 !important;
+    border-color: #adb5bd !important;
+  }
+
+  /*
+    Si el grupo es de 40 alumnos, la tabla se va a dos hojas. Con esto el
+    encabezado de meses se repite arriba en la segunda, para que nadie
+    tenga que regresarse a la primera a ver de qué mes es cada columna.
+    Y ningún renglón se parte a la mitad entre dos hojas.
+  */
+  thead {
+    display: table-header-group;
+  }
+  tr {
+    page-break-inside: avoid;
+  }
+
+  /* Los datos del grupo, más compactos. */
+  .row-datos {
+    font-size: 8pt !important;
+    gap: 0.15rem 0.9rem !important;
+  }
+  .ot-badge {
+    padding: 0.25rem 0.7rem !important;
+    min-width: 0 !important;
+  }
+  .ot-numero {
+    font-size: 1.1rem !important;
+  }
+
+  /* El pie: de qué O.T. es esta hoja y cuándo se imprimió. */
+  .pie-impresion {
+    display: flex !important;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-top: 6px;
+    padding-top: 4px;
+    border-top: 1px solid #adb5bd;
+    font-size: 6.5pt;
+    color: #495057;
+  }
+}
+

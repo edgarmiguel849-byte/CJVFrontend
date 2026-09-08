@@ -1,0 +1,182 @@
+/* Fondo del modal: position fixed lo clava a la ventana, no a la página,
+   para que salga centrado aunque la lista sea larga. */
+.modal-backdrop-custom {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 1050;
+}
+
+/* La hoja de impresión no se ve en pantalla: solo existe en el papel. */
+.hoja-impresion {
+  display: none;
+}
+
+/* ===================================================================
+   IMPRESIÓN
+   Se esconde TODA la aplicación (menú, botones, pantalla) con
+   display:none, que sí saca las cosas del papel, y se deja
+   únicamente la hoja formateada.
+   =================================================================== */
+@media print {
+
+  /* Horizontal, porque son muchas columnas. */
+  @page {
+    size: landscape;
+    margin: 8mm 8mm 10mm 8mm;
+
+    @bottom-right {
+      content: "Hoja " counter(page) " / " counter(pages);
+      font-size: 8pt;
+    }
+  }
+
+  /* Se apaga la pantalla completa. */
+  .cierre-caja-page > .card {
+    display: none !important;
+  }
+
+  /* Y se apaga todo lo que vive FUERA de esta pantalla:
+     el menú lateral, la barra de arriba, el pie de página. */
+  app-sidebar,
+  app-navbar,
+  app-header,
+  app-footer,
+  nav,
+  header,
+  footer {
+    display: none !important;
+  }
+
+  /* Se enciende la hoja. */
+  .hoja-impresion {
+    display: block !important;
+    width: 100%;
+    font-size: 10pt;
+    color: #000;
+  }
+
+  /* Encabezado */
+  .hoja-titulo {
+    text-align: center;
+    font-weight: bold;
+    font-size: 12pt;
+    margin-bottom: 2mm;
+  }
+
+  .hoja-marca {
+    font-weight: bold;
+    font-size: 16pt;
+    letter-spacing: 2px;
+  }
+
+  .hoja-submarca {
+    font-size: 7pt;
+    letter-spacing: 1px;
+    font-weight: normal;
+  }
+
+  .hoja-fecha {
+    text-align: center;
+    font-size: 10pt;
+    margin-bottom: 3mm;
+  }
+
+  .hoja-pendiente {
+    text-align: center;
+    border: 2px solid #000;
+    padding: 2mm;
+    margin-bottom: 3mm;
+    font-weight: bold;
+    letter-spacing: 2px;
+  }
+
+  /* Tablas */
+  .hoja-impresion table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 3mm;
+  }
+
+  .hoja-impresion th,
+  .hoja-impresion td {
+    border: 1px solid #000;
+    padding: 1mm 2mm;
+    font-size: 8.5pt;
+    vertical-align: top;
+  }
+
+  .hoja-impresion th {
+    background-color: #e8e8e8 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    font-weight: bold;
+    text-align: center;
+  }
+
+  .hoja-impresion .num {
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .hoja-impresion .fila-total {
+    font-weight: bold;
+    background-color: #f0f0f0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .hoja-impresion .fila-cancelada td {
+    text-decoration: line-through;
+  }
+
+  /* Bloques de abajo, lado a lado */
+  .hoja-bloques {
+    display: flex;
+    gap: 5mm;
+    margin-top: 3mm;
+  }
+
+  .hoja-bloque {
+    flex: 1;
+  }
+
+  .hoja-bloque h6 {
+    font-size: 9pt;
+    font-weight: bold;
+    margin-bottom: 1mm;
+    border-bottom: 1px solid #000;
+    padding-bottom: 0.5mm;
+  }
+
+  /* Firmas */
+  .hoja-firmas {
+    display: flex;
+    justify-content: space-around;
+    margin-top: 12mm;
+  }
+
+  .hoja-firma {
+    text-align: center;
+    width: 60mm;
+  }
+
+  .hoja-firma-linea {
+    border-top: 1px solid #000;
+    padding-top: 1mm;
+    font-size: 9pt;
+    font-weight: bold;
+  }
+
+  .hoja-firma-nombre {
+    font-size: 8pt;
+    margin-top: 1mm;
+  }
+
+  .hoja-impresion tr {
+    page-break-inside: avoid;
+  }
+}

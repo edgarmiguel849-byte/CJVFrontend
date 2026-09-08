@@ -1,0 +1,50 @@
+.pagos-page {
+  max-width: 1250px;
+}
+
+.modal-backdrop-custom {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1050;
+}
+
+/* Cortesía: paquete regalado. Se distingue en dorado porque no es dinero
+   que haya entrado a la caja ni al banco. */
+.badge-cortesia {
+  background-color: #b8860b;
+  color: #fff;
+}
+
+/* Pago marcado "a Oficina": la comisión se le acredita a Oficina al 10%
+   aunque la O.T. traiga vendedora. Rosa, para que no se confunda con el
+   morado del contrato traspasado. */
+.fila-oficina {
+  background-color: #fce7f3 !important;
+}
+
+.fila-oficina td {
+  color: #9d174d;
+}
+
+.badge-oficina {
+  background-color: #9d174d;
+  color: #fff;
+}
+
+/* La casilla dentro del modal se tiñe cuando está marcada, para que se
+   note de un vistazo antes de guardar. */
+.caja-oficina-activa {
+  background-color: #fce7f3;
+  border-color: #f9a8d4 !important;
+}
+
+/* La lista de alumnos del grupo no debe empujar el modal hacia abajo:
+   con 30 alumnos, mejor que ruede dentro de su propia cajita. */
+.lista-alumnos-buscador {
+  max-height: 240px;
+  overflow-y: auto;
+}

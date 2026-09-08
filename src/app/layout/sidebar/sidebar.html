@@ -1,0 +1,53 @@
+<nav class="sidebar-nav d-flex flex-column p-3" style="width: 260px; background-color: #1e2a3a;">
+
+  <ul class="nav nav-pills flex-column gap-1">
+
+    <li class="nav-item">
+      <a class="nav-link text-white" routerLink="/" routerLinkActive="active">
+        <i class="fi fi-sr-home me-2"></i> Inicio
+      </a>
+    </li>
+
+    <li class="nav-item mt-2">
+      <span class="text-uppercase text-secondary small fw-bold">Gestión de Clientes</span>
+      <ul class="nav nav-pills flex-column ms-3 mt-1 gap-1">
+        <li class="nav-item"><a class="nav-link text-white-50" routerLink="/contratos" routerLinkActive="active">Contratos</a></li>
+        <li class="nav-item"><a class="nav-link text-white-50" routerLink="/contratos-adicionales" routerLinkActive="active">Contratos adicionales</a></li>
+      </ul>
+    </li>
+
+    <li class="nav-item mt-2">
+      <span class="text-uppercase text-secondary small fw-bold">Producción</span>
+      <ul class="nav nav-pills flex-column ms-3 mt-1 gap-1">
+        <li class="nav-item"><a class="nav-link text-white-50" routerLink="/entregas" routerLinkActive="active">Entregas</a></li>
+        <li class="nav-item"><a class="nav-link text-white-50" routerLink="/lista-alumnos" routerLinkActive="active">Lista de Elección de Marcos</a></li>
+        <li class="nav-item"><a class="nav-link text-white-50" routerLink="/ordenes-trabajo" routerLinkActive="active">Órdenes de trabajo</a></li>
+        <li class="nav-item"><a class="nav-link text-white-50" routerLink="/buscar-alumno" routerLinkActive="active">Buscar alumno</a></li>
+      </ul>
+    </li>
+
+    <li class="nav-item mt-2">
+      <span class="text-uppercase text-secondary small fw-bold">Caja</span>
+      <ul class="nav nav-pills flex-column ms-3 mt-1 gap-1">
+        <li class="nav-item"><a class="nav-link text-white-50" routerLink="/pagos" routerLinkActive="active">Pagos</a></li>
+        <li class="nav-item"><a class="nav-link text-white-50" routerLink="/egresos" routerLinkActive="active">Egresos</a></li>
+        <li class="nav-item" *ngIf="esJefe"><a class="nav-link text-white-50" routerLink="/reportes" routerLinkActive="active">Reportes</a></li>
+        <li class="nav-item"><a class="nav-link text-white-50" routerLink="/cierre-caja" routerLinkActive="active">Cierre de caja</a></li>
+      </ul>
+    </li>
+
+    <li class="nav-item mt-2" *ngIf="esJefe">
+      <a class="nav-link text-white" routerLink="/bitacora" routerLinkActive="active">
+        <i class="fi fi-sr-book me-2"></i> Bitácora
+      </a>
+    </li>
+
+    <li class="nav-item" *ngIf="esJefe">
+      <a class="nav-link text-white" routerLink="/usuarios" routerLinkActive="active">
+        <i class="fi fi-sr-user me-2"></i> Usuarios
+      </a>
+    </li>
+
+  </ul>
+
+</nav>

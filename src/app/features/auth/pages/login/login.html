@@ -1,0 +1,37 @@
+<div class="login-container">
+
+  <div class="left-side">
+    <h1 class="text-white fw-bold">Sistema CJV</h1>
+  </div>
+
+  <div class="right-side">
+    <div class="login-box">
+      <h2>Iniciar Sesión</h2>
+
+      @if (mensajeError) {
+        <div class="alert alert-danger py-2">{{ mensajeError }}</div>
+      }
+
+      <input
+        type="text"
+        [(ngModel)]="usuario"
+        name="usuario"
+        class="form-control"
+        placeholder="Usuario"
+        (keyup.enter)="ingresar()" />
+
+      <input
+        type="password"
+        [(ngModel)]="password"
+        name="password"
+        class="form-control"
+        placeholder="Contraseña"
+        (keyup.enter)="ingresar()" />
+
+      <button type="button" class="btn btn-dark" (click)="ingresar()">
+        Entrar
+      </button>
+    </div>
+  </div>
+
+</div>

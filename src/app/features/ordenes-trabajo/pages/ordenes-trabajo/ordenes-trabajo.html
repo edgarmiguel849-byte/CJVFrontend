@@ -1,0 +1,301 @@
+<div class="ordenes-page">
+
+  <div class="card shadow-sm p-4">
+
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+      <div>
+        <h2 class="fw-bold mb-1">Órdenes de Trabajo</h2>
+        <p class="text-muted small mb-0">Expediente de cada carrera o grupo: escuela, generación, vendedora y entrega.</p>
+      </div>
+
+      <button class="btn btn-dark d-flex align-items-center gap-2 fw-semibold px-4" (click)="abrirFormulario()">
+        <i class="fi fi-sr-plus"></i> Nueva O.T.
+      </button>
+    </div>
+
+    <div class="mb-3">
+      <div class="input-group">
+        <span class="input-group-text bg-white border-end-0 text-muted">
+          <i class="fi fi-sr-search"></i>
+        </span>
+        <input type="text" class="form-control border-start-0"
+               placeholder="Buscar por número (44 o 44/26) o por carrera, escuela, grupo, vendedor..."
+               [(ngModel)]="criterioBusqueda" (input)="alEscribirBusqueda()" />
+      </div>
+    </div>
+
+    <!-- Filtros en cascada: ayuda extra, independiente del buscador de arriba -->
+    <div class="border rounded p-3 bg-light mb-4">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="small fw-semibold text-muted">O búscala por Temporada → Universidad → Carrera</span>
+        <button class="btn btn-sm btn-outline-secondary"
+                [disabled]="!hayCascadaActiva()"
+                (click)="limpiarCascada()">
+          Limpiar filtros
+        </button>
+      </div>
+      <div class="row g-2">
+        <div class="col-md-4">
+          <select class="form-select" [(ngModel)]="filtroTemporada" name="filtroTemporada"
+                  (ngModelChange)="alCambiarTemporada()">
+            <option [ngValue]="null">Todas las temporadas</option>
+            <option *ngFor="let anio of temporadasDisponibles()" [ngValue]="anio">{{ anio }}</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <select class="form-select" [(ngModel)]="filtroUniversidad" name="filtroUniversidad"
+                  (ngModelChange)="alCambiarUniversidad()"
+                  [disabled]="filtroTemporada == null">
+            <option [ngValue]="null">Todas las universidades</option>
+            <option *ngFor="let u of universidadesDisponibles()" [ngValue]="u">{{ u }}</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <select class="form-select" [(ngModel)]="filtroCarrera" name="filtroCarrera"
+                  (ngModelChange)="alCambiarCarrera()"
+                  [disabled]="filtroUniversidad == null">
+            <option [ngValue]="null">Todas las carreras</option>
+            <option *ngFor="let c of carrerasDisponibles()" [ngValue]="c">{{ c }}</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div *ngIf="cargando" class="text-center py-4 text-muted">
+      Cargando órdenes de trabajo...
+    </div>
+
+    <div class="table-responsive rounded border" *ngIf="!cargando">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-dark">
+          <tr>
+            <th>O.T.</th>
+            <th>Escuela</th>
+            <th>Siglas</th>
+            <th>Carrera</th>
+            <th>Modalidad</th>
+            <th>Días cobro</th>
+            <th>Grupo</th>
+            <th>Generación</th>
+            <th>Vendedor</th>
+            <th>Entrega</th>
+            <th>Ciclo</th>
+            <th style="text-align: center;">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+
+          <!--
+            RENGLONES FIJOS "0/AA" — los adicionales de cada año.
+            NO son órdenes de trabajo de verdad: son una consulta por año.
+            Se pintan aquí para que el negocio las encuentre donde ya busca.
+          -->
+          <tr *ngFor="let a of aniosAdicionalesVisibles()"
+              class="table-warning"
+              style="cursor: pointer;"
+              (click)="abrirMatrizAdicionales(a.anio)">
+            <td class="fw-bold">{{ a.etiqueta }}</td>
+            <td class="fw-semibold">ADICIONALES</td>
+            <td class="text-muted">—</td>
+            <td class="fw-semibold">Todos los adicionales de {{ a.anio }}</td>
+            <td class="text-muted">—</td>
+            <td class="text-muted">—</td>
+            <td class="text-muted">—</td>
+            <td class="text-muted">—</td>
+            <td class="text-muted">Oficina</td>
+            <td class="text-muted">—</td>
+            <td>
+              <span class="badge bg-success">Abierto</span>
+            </td>
+            <td style="text-align: center;">
+              <div class="d-flex justify-content-center gap-2">
+                <button class="btn btn-sm btn-dark" (click)="abrirMatrizAdicionales(a.anio); $event.stopPropagation()">
+                  Matriz
+                </button>
+              </div>
+            </td>
+          </tr>
+
+          <tr *ngFor="let ot of ordenesFiltradas">
+            <td class="fw-bold text-secondary">{{ formatearNumeroOT(ot) }}</td>
+            <td class="text-muted">{{ ot.escuela || '—' }}</td>
+            <td class="text-muted">{{ ot.siglas || '—' }}</td>
+            <td class="fw-semibold">{{ ot.carreraTexto || '—' }}</td>
+            <td class="text-muted">{{ ot.modalidad || '—' }}</td>
+            <td class="text-muted">{{ ot.diasCobro || '—' }}</td>
+            <td class="text-muted">{{ ot.grupo || '—' }}</td>
+            <td class="text-muted">{{ ot.generacion || '—' }}</td>
+            <td class="text-muted">{{ ot.vendedor?.nombre || '—' }}</td>
+            <!--
+              Entrega. El rojo lo manda la BASE (ot.entregaRecorrida), no el
+              modal. La fecha se formatea con formatearFecha() y NO con el
+              pipe date: ese parsea 'AAAA-MM-DD' como UTC y en México resta
+              un día a toda la columna.
+              Los renglones 0/AA de arriba no pasan por aquí: tienen sus
+              propias celdas escritas a mano.
+            -->
+            <td [ngClass]="esRecorrida(ot) ? 'entrega-recorrida' : 'text-muted'"
+                [title]="tituloEntrega(ot)">
+              {{ formatearFecha(ot.fechaEntrega) || '—' }}
+            </td>
+            <td>
+              <span class="badge"
+                    [ngClass]="cicloCerrado(ot) ? 'bg-secondary' : 'bg-success'"
+                    [title]="tituloCiclo(ot)">
+                {{ cicloCerrado(ot) ? 'Cerrado' : 'Abierto' }}
+              </span>
+            </td>
+            <td style="text-align: center;">
+              <div class="d-flex justify-content-center gap-2">
+                <a class="btn btn-sm btn-outline-dark" [routerLink]="['/ordenes-trabajo', ot.idOrdenTrabajo, 'matriz']">Matriz</a>
+                <button *ngIf="puedeEditar" class="btn btn-sm btn-outline-primary" (click)="prepararEdicion(ot)">Editar</button>
+                <button *ngIf="puedeEditar" class="btn btn-sm btn-outline-danger" (click)="eliminarOrden(ot.idOrdenTrabajo)">Eliminar</button>
+              </div>
+            </td>
+          </tr>
+
+          <tr *ngIf="ordenesFiltradas.length === 0 && aniosAdicionalesVisibles().length === 0">
+            <td colspan="12" class="text-center py-5 text-muted">
+              No se encontraron órdenes de trabajo.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <div class="modal-backdrop-custom d-flex align-items-center justify-content-center" *ngIf="mostrarModal">
+    <div class="card p-4 shadow-lg" style="width: 100%; max-width: 620px; max-height: 90vh; overflow-y: auto;">
+      <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+        <h4 class="fw-bold mb-0">{{ editando ? 'Editar Orden de Trabajo' : 'Nueva Orden de Trabajo' }}</h4>
+        <button type="button" class="btn-close" (click)="cerrarModal()"></button>
+      </div>
+
+      <div class="alert alert-danger py-2 small" *ngIf="errorModal">
+        {{ errorModal }}
+      </div>
+
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Número de O.T. *</label>
+          <input type="number" [(ngModel)]="nuevaOrden.numero" name="numero" class="form-control" placeholder="Ej. 44" />
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Año *</label>
+          <input type="number" [(ngModel)]="nuevaOrden.anio" name="anio" class="form-control" placeholder="Ej. 2026" />
+        </div>
+
+        <div class="col-12">
+          <label class="form-label fw-semibold">Escuela completa *</label>
+          <input type="text" [(ngModel)]="nuevaOrden.escuela" name="escuela" class="form-control"
+                 placeholder="Ej. Instituto Tecnológico Universitario de Gastronomía" />
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Siglas</label>
+          <input type="text" [(ngModel)]="nuevaOrden.siglas" name="siglas" class="form-control" placeholder="Ej. ITUG" />
+        </div>
+
+        <div class="col-md-8">
+          <label class="form-label fw-semibold">Carrera *</label>
+          <input type="text" [(ngModel)]="nuevaOrden.carreraTexto" name="carreraTexto" class="form-control"
+                 placeholder="Ej. Ingeniería en Sistemas Computacionales" />
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Grupo</label>
+          <input type="text" [(ngModel)]="nuevaOrden.grupo" name="grupo" class="form-control" placeholder="Ej. A" />
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Modalidad</label>
+          <select [(ngModel)]="nuevaOrden.modalidad" name="modalidad" class="form-select">
+            <option [ngValue]="''">Sin especificar</option>
+            <option *ngFor="let m of modalidades" [ngValue]="m">{{ m }}</option>
+          </select>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Generación</label>
+          <input type="text" [(ngModel)]="nuevaOrden.generacion" name="generacion" class="form-control" placeholder="Ej. 2022-2026" />
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Días de cobro</label>
+          <input type="text" [(ngModel)]="nuevaOrden.diasCobro" name="diasCobro" class="form-control"
+                 placeholder="Ej. Martes y jueves" />
+        </div>
+
+        <div class="col-12">
+          <label class="form-label fw-semibold">Ejecutivo de ventas (vendedor)</label>
+          <select [(ngModel)]="nuevaOrden.idVendedor" name="idVendedor" class="form-select">
+            <option [ngValue]="null">Sin asignar</option>
+            <option *ngFor="let v of listaVendedores" [ngValue]="v.idVendedor">
+              {{ v.nombre }}
+            </option>
+          </select>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Fecha de entrega *</label>
+          <input type="date" [(ngModel)]="nuevaOrden.fechaEntrega" name="fechaEntrega"
+                 class="form-control"
+                 [class.entrega-recorrida]="entregaEnRojo()"
+                 [disabled]="fechaEntregaBloqueada()" />
+
+          <!--
+            La casilla solo aparece al EDITAR: una O.T. nueva no tiene nada
+            que recorrer, su primera fecha es la original.
+
+            Cuando la O.T. ya viene recorrida de la base, la casilla nace
+            palomeada y deshabilitada: es un letrero de estado, no un
+            interruptor. Apagarla no serviría de nada porque el servidor
+            ignora ese campo del JSON, y la pantalla estaría prometiendo
+            algo que no va a pasar.
+          -->
+          <div class="form-check mt-2" *ngIf="editando">
+            <input class="form-check-input" type="checkbox" id="casillaRecorrimiento"
+                   [(ngModel)]="recorrimientoActivo" name="recorrimientoActivo"
+                   [disabled]="casillaBloqueada()" />
+            <label class="form-check-label fw-semibold" for="casillaRecorrimiento">
+              Recorrimiento
+            </label>
+          </div>
+
+          <div class="form-text" *ngIf="editando && !recorrimientoActivo">
+            Palomea "Recorrimiento" para poder mover la fecha.
+          </div>
+
+          <!--
+            El rojo cuelga de la COMPARACIÓN, no de la casilla: solo se
+            enciende si la fecha tecleada es POSTERIOR a la que traía el
+            modal al abrir. Misma regla que el isAfter() del servidor.
+            Palomear sin mover nada, o adelantar la fecha, no pinta nada.
+          -->
+          <div class="form-text entrega-recorrida" *ngIf="entregaEnRojo() && fechaEntregaOriginal">
+            Entrega recorrida. Se prometió el {{ formatearFecha(fechaEntregaOriginal) }}.
+          </div>
+          <div class="form-text entrega-recorrida" *ngIf="entregaEnRojo() && !fechaEntregaOriginal">
+            Se va a marcar como entrega recorrida.
+          </div>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label fw-semibold">Cierre de ciclo</label>
+          <input type="date" [(ngModel)]="nuevaOrden.fechaCierreCiclo" name="fechaCierreCiclo" class="form-control" />
+          <div class="form-text">Dejalo vacio mientras F.E. no este "definida"</div>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 justify-content-end border-top pt-3 mt-4">
+        <button type="button" class="btn btn-light px-4" (click)="cerrarModal()">Cancelar</button>
+        <button type="button" class="btn btn-dark px-4 fw-semibold" (click)="guardarOrden()">
+          {{ editando ? 'Actualizar' : 'Guardar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>

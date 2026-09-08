@@ -1,0 +1,85 @@
+<div class="escuelas-page">
+
+  <div class="card shadow-sm p-4">
+
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+      <div>
+        <h2 class="fw-bold mb-1">Catálogo de Escuelas</h2>
+        <p class="text-muted small mb-0">Administra las instituciones registradas en el sistema.</p>
+      </div>
+
+      <button class="btn btn-dark d-flex align-items-center gap-2 fw-semibold px-4"
+        (click)="abrirFormulario()">
+        <i class="fi fi-sr-plus"></i> Agregar Escuela
+      </button>
+    </div>
+
+    <div class="mb-4">
+      <div class="input-group">
+        <span class="input-group-text bg-white border-end-0 text-muted">
+          <i class="fi fi-sr-search"></i>
+        </span>
+        <input type="text" class="form-control border-start-0"
+          placeholder="Buscar escuela por nombre o ID..."
+          [(ngModel)]="criterioBusqueda" (input)="filtrarEscuelas()" />
+      </div>
+    </div>
+
+    <div class="table-responsive rounded border" *ngIf="!cargando">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-dark">
+          <tr>
+            <th style="width: 15%;">ID</th>
+            <th style="width: 55%;">Nombre de la Institución</th>
+            <th style="width: 30%; text-align: center;">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let escuela of escuelasFiltradas">
+            <td class="fw-bold text-secondary">#{{ escuela.idEscuela }}</td>
+            <td class="fw-semibold">{{ escuela.nombreEscuela }}</td>
+            <td style="text-align: center;">
+              <div class="d-flex justify-content-center gap-2">
+                <button class="btn btn-sm btn-outline-primary" (click)="prepararEdicion(escuela)">
+                  Editar
+                </button>
+                <button class="btn btn-sm btn-outline-danger" (click)="eliminarEscuela(escuela.idEscuela)">
+                  Eliminar
+                </button>
+              </div>
+            </td>
+          </tr>
+          <tr *ngIf="escuelasFiltradas.length === 0">
+            <td colspan="3" class="text-center py-5 text-muted">
+              No se encontraron escuelas registradas.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <div class="modal-backdrop-custom d-flex align-items-center justify-content-center" *ngIf="mostrarModal">
+    <div class="card p-4 shadow-lg" style="width: 100%; max-width: 480px;">
+      <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+        <h4 class="fw-bold mb-0">{{ editando ? 'Editar Escuela' : 'Registrar Escuela' }}</h4>
+        <button type="button" class="btn-close" (click)="cerrarModal()"></button>
+      </div>
+
+      <div class="mb-4">
+        <label class="form-label fw-semibold">Nombre de la Escuela</label>
+        <input type="text" [(ngModel)]="nuevaEscuela.nombreEscuela" name="nombreEscuela"
+          class="form-control" placeholder="Ej. Universidad Veracruzana" />
+      </div>
+
+      <div class="d-flex gap-2 justify-content-end border-top pt-3">
+        <button type="button" class="btn btn-light px-4" (click)="cerrarModal()">Cancelar</button>
+        <button type="button" class="btn btn-dark px-4 fw-semibold" (click)="guardarEscuela()">
+          {{ editando ? 'Actualizar' : 'Guardar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>

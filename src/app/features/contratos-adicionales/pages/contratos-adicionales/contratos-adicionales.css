@@ -1,0 +1,47 @@
+/* Fondo del modal: 'fixed' lo clava a la ventana (no a la página), para que
+   salga centrado aunque la lista sea larga y haya scroll. El z-index alto lo
+   pone por encima de todo lo demás. */
+.modal-backdrop-custom {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 1050;
+
+  /* Aire alrededor para que en pantallas chicas la ventana no quede
+     pegada a los bordes. */
+  padding: 1rem;
+}
+
+/* Tamaño de la ventana del contrato.
+
+   Aquí es donde se ajusta el ancho si lo vuelven a pedir: se cambia el
+   max-width y ya, no hay que tocar el HTML. Está en UN solo lugar a
+   propósito.
+
+   - width: 100%      -> se encoge sola en pantallas chicas.
+   - max-width: 1040px -> pero no crece más allá de esto en una pantalla grande.
+   - max-height: 92vh  -> ocupa casi toda la altura de la ventana; el resto
+                          se recorre con la rueda del ratón. */
+.modal-adicional {
+  width: 100%;
+  max-width: 1040px;
+  max-height: 92vh;
+  overflow-y: auto;
+}
+
+/* En monitores anchos se le da todavía más aire. */
+@media (min-width: 1400px) {
+  .modal-adicional {
+    max-width: 1180px;
+  }
+}
+
+/* Los renglones de "Artículos Adquiridos": un separador tenue entre uno y
+   otro para que la vista no se pierda cuando hay muchos. */
+.fila-articulo + .fila-articulo {
+  border-top: 1px dashed #dee2e6;
+  padding-top: 0.5rem;
+}

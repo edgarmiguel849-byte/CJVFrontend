@@ -1,0 +1,645 @@
+<div class="comisiones-page">
+
+  <div class="card shadow-sm p-4 mb-3 no-imprimir">
+
+    <div class="mb-4">
+      <h2 class="fw-bold mb-1">Reportes</h2>
+      <p class="text-muted small mb-0">Corte de caja, comisiones y devoluciones por periodo.</p>
+    </div>
+
+    <div class="row g-3 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label fw-semibold" for="desde">Desde</label>
+        <input id="desde" name="desde" type="date" class="form-control" [(ngModel)]="desde" />
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold" for="hasta">Hasta</label>
+        <input id="hasta" name="hasta" type="date" class="form-control" [(ngModel)]="hasta" />
+      </div>
+      <div class="col-md-6 d-flex gap-2 flex-wrap">
+        <button class="btn btn-dark fw-semibold px-4" (click)="generar()">Generar</button>
+        <button class="btn btn-outline-secondary" (click)="rangoHoy()">Hoy</button>
+        <button class="btn btn-outline-secondary" (click)="rangoMesActual()">Mes actual</button>
+        <button class="btn btn-outline-dark d-flex align-items-center gap-2"
+                *ngIf="reporte"
+                (click)="imprimirComisiones()">
+          <i class="fi fi-sr-print"></i> Comisiones
+        </button>
+        <button class="btn btn-outline-danger d-flex align-items-center gap-2"
+                *ngIf="reporte"
+                (click)="imprimirDevoluciones()">
+          <i class="fi fi-sr-print"></i> Devoluciones
+        </button>
+      </div>
+    </div>
+
+    <div class="alert alert-danger py-2 small mt-3 mb-0" *ngIf="error">
+      {{ error }}
+    </div>
+  </div>
+
+  <div *ngIf="cargando" class="text-center py-5 text-muted no-imprimir">
+    Generando reporte...
+  </div>
+
+  <div *ngIf="!cargando && reporte" class="no-imprimir">
+
+    <!--
+      ============ LOS BOTONES ============
+      Pasaron de 5 a 8 con los tres talonarios. Se cambió 'col-lg' (que
+      repartía el ancho entre todos) por 'col-lg-3': con ocho en un solo
+      renglón quedaban tan angostos que se cortaban los montos. Ahora caen
+      en dos renglones de cuatro.
+    -->
+    <div class="row g-2 mb-4">
+
+      <div class="col-6 col-lg-3">
+        <button class="btn w-100 text-start p-3 h-100"
+                [ngClass]="estaAbierto('ingresos') ? 'btn-light border border-2 border-dark' : 'btn-light border'"
+                (click)="abrir('ingresos')">
+          <div class="text-muted small mb-1">Ingresos</div>
+          <div class="fs-5 fw-bold">{{ totalIngresos() | currency:'MXN':'symbol-narrow':'1.2-2' }}</div>
+          <div class="text-muted" style="font-size: 0.7rem;">incluye cortesías</div>
+        </button>
+      </div>
+
+      <div class="col-6 col-lg-3">
+        <button class="btn w-100 text-start p-3 h-100"
+                [ngClass]="estaAbierto('comisiones') ? 'btn-light border border-2 border-dark' : 'btn-light border'"
+                (click)="abrir('comisiones')">
+          <div class="text-muted small mb-1">Comisiones</div>
+          <div class="fs-5 fw-bold text-primary">{{ totalComisiones() | currency:'MXN':'symbol-narrow':'1.2-2' }}</div>
+          <div class="text-muted" style="font-size: 0.7rem;">{{ cuantasVendedoras() }} destinatarios</div>
+        </button>
+      </div>
+
+      <div class="col-6 col-lg-3">
+        <button class="btn w-100 text-start p-3 h-100"
+                [ngClass]="estaAbierto('cortesias') ? 'btn-light border border-2 border-dark' : 'btn-light border'"
+                (click)="abrir('cortesias')">
+          <div class="text-muted small mb-1">Cortesías</div>
+          <div class="fs-5 fw-bold" style="color: #b8860b;">{{ totalCortesias() | currency:'MXN':'symbol-narrow':'1.2-2' }}</div>
+          <div class="text-muted" style="font-size: 0.7rem;">{{ cuantasCortesias() }} otorgadas</div>
+        </button>
+      </div>
+
+      <div class="col-6 col-lg-3">
+        <button class="btn w-100 text-start p-3 h-100"
+                [ngClass]="estaAbierto('devoluciones') ? 'btn-light border border-2 border-dark' : 'btn-light border'"
+                (click)="abrir('devoluciones')">
+          <div class="text-muted small mb-1">Devoluciones</div>
+          <div class="fs-5 fw-bold text-danger">{{ totalDevoluciones() | currency:'MXN':'symbol-narrow':'1.2-2' }}</div>
+          <div class="text-muted" style="font-size: 0.7rem;">{{ cuantasDevoluciones() }} movimientos</div>
+        </button>
+      </div>
+
+      <div class="col-6 col-lg-3">
+        <button class="btn w-100 text-start p-3 h-100"
+                [ngClass]="estaAbierto('egresos') ? 'btn-light border border-2 border-dark' : 'btn-light border'"
+                (click)="abrir('egresos')">
+          <div class="text-muted small mb-1">Egresos</div>
+          <div class="fs-5 fw-bold text-danger">{{ totalEgresos() | currency:'MXN':'symbol-narrow':'1.2-2' }}</div>
+          <div class="text-muted" style="font-size: 0.7rem;">{{ cuantosEgresos() }} gastos</div>
+        </button>
+      </div>
+
+      <!--
+        CONTROL DE FOLIOS: tres talonarios INDEPENDIENTES.
+
+        Cada tipo lleva su propio recorrido por el abecedario, así que el
+        folio C2672 de recibos y el de contratos son papeles distintos y
+        nunca se mezclan.
+
+        El número grande son los ROJOS: los folios que se echaron a perder.
+        Es lo que se quiere ver de un golpe; los verdes van de subtítulo.
+
+        Solo para el Jefe: el endpoint del backend responde 403 a los demás.
+      -->
+      <div class="col-6 col-lg-3" *ngIf="esJefe">
+        <button class="btn w-100 text-start p-3 h-100"
+                [ngClass]="estaAbierto('folios-recibos') ? 'btn-light border border-2 border-dark' : 'btn-light border'"
+                (click)="abrir('folios-recibos')">
+          <div class="text-muted small mb-1">Folios recibos</div>
+          <div class="fs-5 fw-bold" [ngClass]="cuantosRojos('RECIBO') > 0 ? 'text-danger' : 'text-success'">
+            {{ cuantosRojos('RECIBO') }}
+          </div>
+          <div class="text-muted" style="font-size: 0.7rem;">
+            sin usar · {{ cuantosVerdes('RECIBO') }} usados
+          </div>
+        </button>
+      </div>
+
+      <div class="col-6 col-lg-3" *ngIf="esJefe">
+        <button class="btn w-100 text-start p-3 h-100"
+                [ngClass]="estaAbierto('folios-contratos') ? 'btn-light border border-2 border-dark' : 'btn-light border'"
+                (click)="abrir('folios-contratos')">
+          <div class="text-muted small mb-1">Folios contratos</div>
+          <div class="fs-5 fw-bold" [ngClass]="cuantosRojos('CONTRATO') > 0 ? 'text-danger' : 'text-success'">
+            {{ cuantosRojos('CONTRATO') }}
+          </div>
+          <div class="text-muted" style="font-size: 0.7rem;">
+            sin usar · {{ cuantosVerdes('CONTRATO') }} usados
+          </div>
+        </button>
+      </div>
+
+      <div class="col-6 col-lg-3" *ngIf="esJefe">
+        <button class="btn w-100 text-start p-3 h-100"
+                [ngClass]="estaAbierto('folios-adicionales') ? 'btn-light border border-2 border-dark' : 'btn-light border'"
+                (click)="abrir('folios-adicionales')">
+          <div class="text-muted small mb-1">Folios adicionales</div>
+          <div class="fs-5 fw-bold" [ngClass]="cuantosRojos('ADICIONAL') > 0 ? 'text-danger' : 'text-success'">
+            {{ cuantosRojos('ADICIONAL') }}
+          </div>
+          <div class="text-muted" style="font-size: 0.7rem;">
+            sin usar · {{ cuantosVerdes('ADICIONAL') }} usados
+          </div>
+        </button>
+      </div>
+
+    </div>
+
+    <!-- ============ INGRESOS ============ -->
+    <div class="card shadow-sm p-4" *ngIf="estaAbierto('ingresos')">
+      <h5 class="fw-bold mb-1">Ingresos por modalidad</h5>
+      <p class="text-muted small">
+        Los ingresos contienen los recibos que fueron registrados con las
+        modalidades efectivo, transferencia, tarjeta, depósito y cortesía.
+      </p>
+
+      <div class="table-responsive rounded border">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-dark">
+            <tr>
+              <th>Modalidad</th>
+              <th class="text-center">Recibos</th>
+              <th class="text-end">Monto</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let fila of ingresosPorModalidad()">
+              <td class="fw-semibold">{{ fila.modalidad }}</td>
+              <td class="text-center text-muted">{{ fila.cantidad }}</td>
+              <td class="text-end fw-semibold"
+                  [style.color]="fila.modalidad === 'Cortesía' ? '#b8860b' : null">
+                {{ fila.monto | currency:'MXN':'symbol-narrow':'1.2-2' }}
+              </td>
+            </tr>
+            <tr *ngIf="ingresosPorModalidad().length === 0">
+              <td colspan="3" class="text-center py-4 text-muted">
+                No hubo ingresos en este periodo.
+              </td>
+            </tr>
+          </tbody>
+          <tfoot *ngIf="ingresosPorModalidad().length > 0">
+            <tr class="table-light fw-bold">
+              <td colspan="2">TOTAL DE INGRESOS</td>
+              <td class="text-end">{{ totalIngresos() | currency:'MXN':'symbol-narrow':'1.2-2' }}</td>
+            </tr>
+            <tr>
+              <td colspan="2" class="small" style="color: #b8860b;">Menos cortesías</td>
+              <td class="text-end fw-semibold" style="color: #b8860b;">
+                – {{ totalCortesias() | currency:'MXN':'symbol-narrow':'1.2-2' }}
+              </td>
+            </tr>
+            <tr>
+              <td colspan="2" class="small text-danger">Menos devoluciones</td>
+              <td class="text-end fw-semibold text-danger">
+                – {{ totalDevoluciones() | currency:'MXN':'symbol-narrow':'1.2-2' }}
+              </td>
+            </tr>
+            <tr class="table-light fw-bold">
+              <td colspan="2">DINERO REAL QUE ENTRÓ</td>
+              <td class="text-end text-success">
+                {{ dineroRealQueEntro() | currency:'MXN':'symbol-narrow':'1.2-2' }}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- ============ COMISIONES ============ -->
+    <div class="card shadow-sm p-4" *ngIf="estaAbierto('comisiones')">
+      <h5 class="fw-bold mb-1">Comisiones por destinatario</h5>
+      <p class="text-muted small">
+        Lo cobrado va neto: las devoluciones del periodo ya están restadas.
+      </p>
+
+      <div class="table-responsive rounded border">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-dark">
+            <tr>
+              <th>Destinatario</th>
+              <th class="text-end">Cobrado</th>
+              <th class="text-center">%</th>
+              <th class="text-end">Comisión</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let fila of reporte.filas" [class.table-warning]="esOficina(fila)">
+              <td class="fw-semibold">{{ fila.nombre }}</td>
+              <td class="text-end" [class.text-danger]="fila.montoCobrado < 0">
+                {{ fila.montoCobrado | currency:'MXN':'symbol-narrow':'1.2-2' }}
+              </td>
+              <td class="text-center text-muted">{{ fila.porcentaje }}%</td>
+              <td class="text-end fw-bold"
+                  [ngClass]="fila.comision < 0 ? 'text-danger' : 'text-primary'">
+                {{ fila.comision | currency:'MXN':'symbol-narrow':'1.2-2' }}
+              </td>
+            </tr>
+            <tr *ngIf="!reporte.filas || reporte.filas.length === 0">
+              <td colspan="4" class="text-center py-4 text-muted">
+                No hubo movimientos en este periodo.
+              </td>
+            </tr>
+          </tbody>
+          <tfoot *ngIf="reporte.filas && reporte.filas.length > 0">
+            <tr class="table-light fw-bold">
+              <td>SUMATORIA</td>
+              <td class="text-end">{{ reporte.totalCobrado | currency:'MXN':'symbol-narrow':'1.2-2' }}</td>
+              <td></td>
+              <td class="text-end text-primary">{{ reporte.totalComisiones | currency:'MXN':'symbol-narrow':'1.2-2' }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- ============ CORTESÍAS ============ -->
+    <div class="card shadow-sm p-4" *ngIf="estaAbierto('cortesias')">
+      <h5 class="fw-bold mb-1">Cortesías otorgadas</h5>
+      <p class="text-muted small">
+        Paquetes regalados. No comisionan a nadie y se restan de los ingresos
+        para saber cuánto dinero entró de verdad.
+      </p>
+
+      <div class="table-responsive rounded border">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-dark">
+            <tr>
+              <th>Fecha</th>
+              <th>Folio</th>
+              <th>Alumno</th>
+              <th>Escuela</th>
+              <th>Motivo</th>
+              <th class="text-end">Monto</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let c of cortesias()">
+              <td class="text-muted small">{{ c.fecha | date:'dd/MM/yyyy' }}</td>
+              <td class="fw-semibold text-secondary small">{{ c.folio || '—' }}</td>
+              <td class="small">{{ c.alumno }}</td>
+              <td class="text-muted small">{{ c.escuela }}</td>
+              <td class="text-muted small">{{ c.motivo || '—' }}</td>
+              <td class="text-end fw-semibold" style="color: #b8860b;">
+                {{ c.monto | currency:'MXN':'symbol-narrow':'1.2-2' }}
+              </td>
+            </tr>
+            <tr *ngIf="cortesias().length === 0">
+              <td colspan="6" class="text-center py-4 text-muted">
+                No se otorgaron cortesías en este periodo.
+              </td>
+            </tr>
+          </tbody>
+          <tfoot *ngIf="cortesias().length > 0">
+            <tr class="table-light fw-bold">
+              <td colspan="5">TOTAL DE CORTESÍAS</td>
+              <td class="text-end" style="color: #b8860b;">
+                {{ totalCortesias() | currency:'MXN':'symbol-narrow':'1.2-2' }}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- ============ DEVOLUCIONES ============ -->
+    <div class="card shadow-sm p-4" *ngIf="estaAbierto('devoluciones')">
+      <h5 class="fw-bold mb-1">Devoluciones del periodo</h5>
+      <p class="text-muted small">
+        Dinero que salió porque el alumno pagó de más. Esto es lo que explica
+        por qué le bajó la comisión a cada vendedora.
+      </p>
+
+      <div class="table-responsive rounded border">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-dark">
+            <tr>
+              <th>Fecha</th>
+              <th>Folio</th>
+              <th>Alumno</th>
+              <th>Escuela</th>
+              <th>Se le restó a</th>
+              <th>Salió por</th>
+              <th>Motivo</th>
+              <th class="text-end">Monto</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let d of devoluciones()">
+              <td class="text-muted small">{{ d.fecha | date:'dd/MM/yyyy' }}</td>
+              <td class="fw-semibold text-danger small">{{ d.folio }}</td>
+              <td class="small">{{ d.alumno }}</td>
+              <td class="text-muted small">{{ d.escuela }}</td>
+              <td class="small fw-semibold">{{ d.destinatario }}</td>
+              <td class="text-muted small">{{ d.modalidad }}</td>
+              <td class="text-muted small">{{ d.motivo || '—' }}</td>
+              <td class="text-end fw-semibold text-danger">
+                {{ d.monto | currency:'MXN':'symbol-narrow':'1.2-2' }}
+              </td>
+            </tr>
+            <tr *ngIf="devoluciones().length === 0">
+              <td colspan="8" class="text-center py-4 text-muted">
+                No hubo devoluciones en este periodo.
+              </td>
+            </tr>
+          </tbody>
+          <tfoot *ngIf="devoluciones().length > 0">
+            <tr class="table-light fw-bold">
+              <td colspan="7">TOTAL DEVUELTO</td>
+              <td class="text-end text-danger">
+                {{ totalDevoluciones() | currency:'MXN':'symbol-narrow':'1.2-2' }}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- ============ EGRESOS ============ -->
+    <div class="card shadow-sm p-4" *ngIf="estaAbierto('egresos')">
+      <h5 class="fw-bold mb-1">Egresos del periodo</h5>
+      <p class="text-muted small">
+        Gastos pagados desde la caja.
+      </p>
+
+      <div class="table-responsive rounded border">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-dark">
+            <tr>
+              <th>Fecha</th>
+              <th>Concepto</th>
+              <th>Registró</th>
+              <th class="text-end">Importe</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let e of listaEgresos">
+              <td class="text-muted small">{{ e.fechaEgreso | date:'dd/MM/yyyy' }}</td>
+              <td>
+                <div class="fw-semibold small">{{ e.concepto }}</div>
+                <div class="small text-muted" *ngIf="e.comentarios">{{ e.comentarios }}</div>
+              </td>
+              <td class="text-muted small">{{ e.usuario?.nombreUsuario || '—' }}</td>
+              <td class="text-end fw-semibold text-danger">
+                {{ e.monto | currency:'MXN':'symbol-narrow':'1.2-2' }}
+              </td>
+            </tr>
+            <tr *ngIf="listaEgresos.length === 0">
+              <td colspan="4" class="text-center py-4 text-muted">
+                No hubo egresos en este periodo.
+              </td>
+            </tr>
+          </tbody>
+          <tfoot *ngIf="listaEgresos.length > 0">
+            <tr class="table-light fw-bold">
+              <td colspan="3">TOTAL DE EGRESOS</td>
+              <td class="text-end text-danger">
+                {{ totalEgresos() | currency:'MXN':'symbol-narrow':'1.2-2' }}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- ============ CONTROL DE FOLIOS ============ -->
+    <!--
+      El molde se escribe UNA vez y se usa para los tres talonarios. Lo
+      único que cambia es el título y de qué lista sale.
+    -->
+    <ng-template #panelFolios let-lista="lista" let-titulo="titulo" let-cual="cual">
+      <div class="card shadow-sm p-4">
+        <h5 class="fw-bold mb-1">{{ titulo }}</h5>
+        <p class="text-muted small">
+          Verde: el folio se usó. Rojo: se marcó como no utilizado.
+          El color no depende del dinero ni del estado del contrato —
+          un contrato cancelado que sí se cobró va verde.
+        </p>
+
+        <!--
+          LAS LETRAS DEL TALONARIO.
+
+          Solo salen las series que EXISTEN en este talonario, con su
+          conteo. Poner las 25 de la A a la Y llenaría esto de botones
+          vacíos y no se sabría cuáles sirven.
+
+          "Todas" está siempre al principio. Volver a picarle a la letra
+          que ya está elegida también la quita.
+        -->
+        <div class="d-flex flex-wrap gap-2 align-items-center mb-3"
+             *ngIf="seriesDe(cual).length > 0">
+          <span class="text-muted small me-1">Serie:</span>
+
+          <button type="button"
+                  class="btn btn-sm"
+                  [ngClass]="serieDe(cual) == null ? 'btn-dark' : 'btn-outline-secondary'"
+                  (click)="elegirSerie(cual, null)">
+            Todas ({{ foliosDe(cual).length }})
+          </button>
+
+          <button type="button"
+                  class="btn btn-sm"
+                  *ngFor="let letra of seriesDe(cual)"
+                  [ngClass]="serieDe(cual) === letra ? 'btn-dark' : 'btn-outline-secondary'"
+                  (click)="elegirSerie(cual, letra)">
+            {{ letra }} ({{ cuantosEnSerie(cual, letra) }})
+          </button>
+        </div>
+
+        <div class="table-responsive rounded border">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-dark">
+              <tr>
+                <th style="width: 12%;">Folio</th>
+                <th style="width: 14%;">Fecha</th>
+                <th>Alumno</th>
+                <th class="text-end" style="width: 16%;">Monto</th>
+                <th class="text-center" style="width: 14%;">Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- foliosVisibles() ya aplica el filtro de la letra. -->
+              <tr *ngFor="let f of foliosVisibles(cual)">
+                <td class="fw-bold" [ngClass]="f.usado ? 'text-success' : 'text-danger'">
+                  {{ f.folio }}
+                </td>
+                <td class="text-muted small">{{ f.fecha | date:'dd/MM/yyyy' }}</td>
+                <td class="small">{{ f.descripcion || '—' }}</td>
+                <td class="text-end small" [class.text-muted]="!f.usado">
+                  <ng-container *ngIf="f.usado">
+                    {{ f.monto | currency:'MXN':'symbol-narrow':'1.2-2' }}
+                  </ng-container>
+                  <ng-container *ngIf="!f.usado">—</ng-container>
+                </td>
+                <td class="text-center">
+                  <span class="badge" [ngClass]="f.usado ? 'bg-success' : 'bg-danger'">
+                    {{ f.usado ? 'Usado' : 'Sin usar' }}
+                  </span>
+                </td>
+              </tr>
+              <tr *ngIf="foliosVisibles(cual).length === 0 && foliosDe(cual).length === 0">
+                <td colspan="5" class="text-center py-4 text-muted">
+                  No hay folios registrados en este periodo.
+                </td>
+              </tr>
+
+              <!-- Sí hay folios, pero ninguno de la letra elegida. Se dice
+                   con todas sus letras para que no parezca que falta algo. -->
+              <tr *ngIf="foliosVisibles(cual).length === 0 && foliosDe(cual).length > 0">
+                <td colspan="5" class="text-center py-4 text-muted">
+                  No hay folios de la serie <strong>{{ serieDe(cual) }}</strong>
+                  en este periodo.
+                </td>
+              </tr>
+            </tbody>
+            <!-- El pie cuenta lo que se está VIENDO, no el talonario
+                 completo: si dijera el total con una letra filtrada,
+                 contradiría a los renglones de arriba. -->
+            <tfoot *ngIf="foliosVisibles(cual).length > 0">
+              <tr class="table-light fw-bold">
+                <td colspan="4">
+                  {{ verdesVisibles(cual) }} usados · {{ rojosVisibles(cual) }} sin usar
+                  <span class="fw-normal text-muted small ms-1" *ngIf="serieDe(cual)">
+                    (serie {{ serieDe(cual) }})
+                  </span>
+                </td>
+                <td class="text-center">{{ foliosVisibles(cual).length }}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <div class="form-text mt-2">
+          Solo aparecen los folios que existen en el sistema. Un folio del
+          talonario que nadie capturó todavía no sale en esta lista.
+        </div>
+      </div>
+    </ng-template>
+
+    <ng-container *ngIf="estaAbierto('folios-recibos')"
+      [ngTemplateOutlet]="panelFolios"
+      [ngTemplateOutletContext]="{ lista: foliosRecibos, titulo: 'Control general de recibos', cual: 'RECIBO' }">
+    </ng-container>
+
+    <ng-container *ngIf="estaAbierto('folios-contratos')"
+      [ngTemplateOutlet]="panelFolios"
+      [ngTemplateOutletContext]="{ lista: foliosContratos, titulo: 'Control general de contratos', cual: 'CONTRATO' }">
+    </ng-container>
+
+    <ng-container *ngIf="estaAbierto('folios-adicionales')"
+      [ngTemplateOutlet]="panelFolios"
+      [ngTemplateOutletContext]="{ lista: foliosAdicionales, titulo: 'Control general de contratos adicionales', cual: 'ADICIONAL' }">
+    </ng-container>
+
+  </div>
+
+  <div *ngIf="!cargando && !reporte && yaConsulto" class="text-center py-5 text-muted no-imprimir">
+    No hay datos para este periodo.
+  </div>
+
+  <!-- ============================================================
+       HOJAS DE IMPRESIÓN
+       No se ven en pantalla. Cada una se arma solo cuando se pide,
+       y solo sale la que se pidió.
+       ============================================================ -->
+  <div class="hoja-impresion" *ngIf="imprimiendo === 'comisiones'">
+
+    <div class="hoja-titulo">
+      <div class="hoja-nombre">REPORTE DE COMISIONES</div>
+      <div class="hoja-periodo">
+        Del {{ desde | date:'dd/MM/yyyy' }} al {{ hasta | date:'dd/MM/yyyy' }}
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 40%;">Destinatario</th>
+          <th class="num">Cobrado</th>
+          <th class="num" style="width: 12%;">%</th>
+          <th class="num">Comisión</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let fila of reporte.filas">
+          <td>{{ fila.nombre }}</td>
+          <td class="num">{{ fila.montoCobrado | number:'1.2-2' }}</td>
+          <td class="num">{{ fila.porcentaje }}%</td>
+          <td class="num">{{ fila.comision | number:'1.2-2' }}</td>
+        </tr>
+        <tr *ngIf="!reporte.filas || reporte.filas.length === 0">
+          <td colspan="4">Sin movimientos en este periodo.</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr class="fila-total">
+          <td colspan="3">SUMA DE COMISIONES</td>
+          <td class="num">{{ totalComisiones() | number:'1.2-2' }}</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <div style="font-size: 8pt; margin-top: 2mm;">
+      Lo cobrado va neto: las devoluciones del periodo ya están restadas.
+    </div>
+  </div>
+
+  <div class="hoja-impresion" *ngIf="imprimiendo === 'devoluciones'">
+
+    <div class="hoja-titulo">
+      <div class="hoja-nombre">REPORTE DE DEVOLUCIONES</div>
+      <div class="hoja-periodo">
+        Del {{ desde | date:'dd/MM/yyyy' }} al {{ hasta | date:'dd/MM/yyyy' }}
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 10%;">Fecha</th>
+          <th style="width: 9%;">Folio</th>
+          <th style="width: 24%;">Alumno</th>
+          <th style="width: 18%;">Escuela</th>
+          <th style="width: 14%;">Se le restó a</th>
+          <th style="width: 13%;">Motivo</th>
+          <th class="num">Monto</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let d of devoluciones()">
+          <td>{{ d.fecha | date:'dd/MM/yyyy' }}</td>
+          <td>{{ d.folio }}</td>
+          <td>{{ d.alumno }}</td>
+          <td>{{ d.escuela }}</td>
+          <td>{{ d.destinatario }}</td>
+          <td>{{ d.motivo || '' }}</td>
+          <td class="num">{{ d.monto | number:'1.2-2' }}</td>
+        </tr>
+        <tr *ngIf="devoluciones().length === 0">
+          <td colspan="7">Sin devoluciones en este periodo.</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr class="fila-total">
+          <td colspan="6">TOTAL DEVUELTO</td>
+          <td class="num">{{ totalDevoluciones() | number:'1.2-2' }}</td>
+        </tr>
+      </tfoot>
+    </table>
+      
+  </div>
+
+</div>

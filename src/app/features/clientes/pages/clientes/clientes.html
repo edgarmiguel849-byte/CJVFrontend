@@ -1,0 +1,128 @@
+<div class="clientes-page">
+
+  <div class="card shadow-sm p-4">
+
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+      <div>
+        <h2 class="fw-bold mb-1">Catálogo de Clientes</h2>
+        <p class="text-muted small mb-0">Administra los alumnos registrados en el sistema.</p>
+      </div>
+
+      <button class="btn btn-dark d-flex align-items-center gap-2 fw-semibold px-4"
+        (click)="abrirFormulario()">
+        <i class="fi fi-sr-plus"></i> Agregar Cliente
+      </button>
+    </div>
+
+    <div class="mb-4">
+      <div class="input-group">
+        <span class="input-group-text bg-white border-end-0 text-muted">
+          <i class="fi fi-sr-search"></i>
+        </span>
+        <input type="text" class="form-control border-start-0"
+          placeholder="Buscar por nombre, teléfono o carrera..."
+          [(ngModel)]="criterioBusqueda" (input)="filtrarClientes()" />
+      </div>
+    </div>
+
+    <div *ngIf="cargando" class="text-center py-4 text-muted">
+      Cargando clientes...
+    </div>
+
+    <div class="table-responsive rounded border" *ngIf="!cargando">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-dark">
+          <tr>
+            <th style="width: 8%;">ID</th>
+            <th style="width: 27%;">Nombre Completo</th>
+            <th style="width: 15%;">Teléfono</th>
+            <th style="width: 25%;">Carrera</th>
+            <th style="width: 25%; text-align: center;">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let cliente of clientesFiltrados">
+            <td class="fw-bold text-secondary">#{{ cliente.idCliente }}</td>
+            <td class="fw-semibold">{{ cliente.nombreCompleto }}</td>
+            <td class="text-muted">
+              <div>{{ cliente.telefono || '—' }}</div>
+              <div class="small" *ngIf="cliente.telefono2">{{ cliente.telefono2 }}</div>
+            </td>
+            <td class="text-muted">{{ cliente.carrera?.nombreCarrera }}</td>
+            <td style="text-align: center;">
+              <div class="d-flex justify-content-center gap-2">
+                <button class="btn btn-sm btn-outline-primary" (click)="prepararEdicion(cliente)">
+                  Editar
+                </button>
+                <button class="btn btn-sm btn-outline-danger" (click)="eliminarCliente(cliente.idCliente)">
+                  Eliminar
+                </button>
+              </div>
+            </td>
+          </tr>
+          <tr *ngIf="clientesFiltrados.length === 0">
+            <td colspan="5" class="text-center py-5 text-muted">
+              No se encontraron clientes registrados.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <div class="modal-backdrop-custom d-flex align-items-center justify-content-center" *ngIf="mostrarModal">
+    <div class="card p-4 shadow-lg" style="width: 100%; max-width: 560px;">
+      <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+        <h4 class="fw-bold mb-0">{{ editando ? 'Editar Cliente' : 'Registrar Cliente' }}</h4>
+        <button type="button" class="btn-close" (click)="cerrarModal()"></button>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Nombre(s) *</label>
+          <input type="text" [(ngModel)]="nuevoCliente.nombre" name="nombre" class="form-control" placeholder="Nombre" />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Apellido Paterno *</label>
+          <input type="text" [(ngModel)]="nuevoCliente.apellidoPaterno" name="apellidoPaterno" class="form-control" placeholder="Paterno" />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Apellido Materno</label>
+          <input type="text" [(ngModel)]="nuevoCliente.apellidoMaterno" name="apellidoMaterno" class="form-control" placeholder="Materno" />
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Teléfono</label>
+          <input type="text" [(ngModel)]="nuevoCliente.telefono" name="telefono" class="form-control" placeholder="Ej. 2281234567" />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Teléfono 2</label>
+          <input type="text" [(ngModel)]="nuevoCliente.telefono2" name="telefono2" class="form-control" placeholder="Opcional" />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Correo</label>
+          <input type="email" [(ngModel)]="nuevoCliente.correo" name="correo" class="form-control" placeholder="ejemplo@correo.com" />
+        </div>
+
+        <div class="col-12">
+          <label class="form-label fw-semibold">Carrera *</label>
+          <select [(ngModel)]="nuevoCliente.idCarrera" name="idCarrera" class="form-select">
+            <option [ngValue]="null" disabled>Selecciona una carrera...</option>
+            <option *ngFor="let carrera of listaCarreras" [ngValue]="carrera.idCarrera">
+              {{ carrera.nombreCarrera }} — {{ carrera.escuela?.nombreEscuela }}
+            </option>
+          </select>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 justify-content-end border-top pt-3 mt-4">
+        <button type="button" class="btn btn-light px-4" (click)="cerrarModal()">Cancelar</button>
+        <button type="button" class="btn btn-dark px-4 fw-semibold" (click)="guardarCliente()">
+          {{ editando ? 'Actualizar' : 'Guardar' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>
