@@ -1,10 +1,8 @@
 <div class="cierre-caja-page">
 
   <div class="card shadow-sm p-4">
-                                    
-    <div class="mb-4">              
-                                    
-                                    
+
+    <div class="mb-4">
       <h2 class="fw-bold mb-1">Cierre de Caja</h2>
       <p class="text-muted small mb-0">Control de contratos y recibos de oficina — corte del día.</p>
     </div>
@@ -36,6 +34,74 @@
 
     <div *ngIf="!cargando && corte">
 
+      <!-- ============================================================
+           LA LISTA DEL JEFE
+           Solo él la ve. Un día puede traer el corte de Tete y dos del
+           Administrador; antes la pantalla enseñaba UNO solo y el Jefe
+           autorizaba el equivocado sin darse cuenta.
+           ============================================================ -->
+      <div class="mb-4" *ngIf="esJefe && cortesDelDia.length > 0">
+        <h5 class="fw-bold mb-3">
+          Cortes entregados este día
+          <span class="badge bg-secondary ms-1">{{ cortesDelDia.length }}</span>
+        </h5>
+
+        <div class="table-responsive rounded border">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-dark">
+              <tr>
+                <th>Entregó</th>
+                <th>Hora</th>
+                <th class="text-end">Esperado</th>
+                <th class="text-end">Contado</th>
+                <th class="text-end">Diferencia</th>
+                <th class="text-center">Estado</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let c of cortesDelDia"
+                  [class.table-primary]="esCorteSeleccionado(c)">
+                <td class="fw-semibold">{{ c.usuario?.nombreUsuario || '(sin usuario)' }}</td>
+
+                <!-- Los cortes anteriores a que existiera la columna no
+                     tienen hora. Sale un guion: no se sabe y no se inventa. -->
+                <td class="text-muted small">
+                  {{ c.fechaHoraEntrega ? (c.fechaHoraEntrega | date:'HH:mm') : '—' }}
+                </td>
+
+                <td class="text-end">{{ c.efectivoEsperado | currency:'MXN':'symbol-narrow':'1.2-2' }}</td>
+                <td class="text-end">{{ c.efectivoContado | currency:'MXN':'symbol-narrow':'1.2-2' }}</td>
+                <td class="text-end fw-semibold"
+                    [class.text-success]="c.diferencia == 0"
+                    [class.text-danger]="c.diferencia != 0">
+                  {{ c.diferencia | currency:'MXN':'symbol-narrow':'1.2-2' }}
+                </td>
+                <td class="text-center">
+                  <span class="badge" [ngClass]="claseEstado(c.estado)">{{ c.estado }}</span>
+                </td>
+                <td class="text-end">
+                  <button
+                    class="btn btn-sm"
+                    [ngClass]="esCorteSeleccionado(c) ? 'btn-dark' : 'btn-outline-dark'"
+                    (click)="seleccionarCorte(c)">
+                    {{ esCorteSeleccionado(c) ? 'Abierto' : 'Revisar' }}
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Con varios cortes no se preselecciona ninguno: escoger por el
+             Jefe es justo el bug que tenía la pantalla vieja. -->
+        <div class="alert alert-info py-2 small mt-3 mb-0"
+             *ngIf="hayVariosCortes() && !estaCerrado()">
+          Hay {{ cortesDelDia.length }} cortes este día. Abre uno con
+          <strong>Revisar</strong> para ver su arqueo y autorizarlo.
+        </div>
+      </div>
+
       <div class="alert d-flex flex-wrap justify-content-between align-items-center gap-2"
            *ngIf="estaCerrado()"
            [ngClass]="estaAutorizado() ? 'alert-success' : 'alert-warning'">
@@ -44,6 +110,9 @@
           <strong *ngIf="estaEnviado()">Cierre enviado, pendiente de autorizar</strong>
           <div class="small mt-1">
             Enviado por {{ cierreGuardado.usuario?.nombreUsuario }}
+            <span *ngIf="cierreGuardado.fechaHoraEntrega">
+              · {{ cierreGuardado.fechaHoraEntrega | date:'dd/MM/yyyy HH:mm' }}
+            </span>
             <span *ngIf="estaAutorizado()">
               · Autorizado por {{ cierreGuardado.usuarioAutoriza?.nombreUsuario }}
               el {{ cierreGuardado.fechaAutorizacion | date:'dd/MM/yyyy HH:mm' }}
@@ -74,6 +143,15 @@
             Eliminar
           </button>
         </div>
+      </div>
+
+      <!-- Por qué desaparece el botón Imprimir cuando hay varios cortes.
+           Sin este aviso parece que se descompuso el sistema. -->
+      <div class="alert alert-secondary py-2 small"
+           *ngIf="esJefe && hayVariosCortes() && estaCerrado()">
+        La hoja impresa de este día no está disponible: el detalle de abajo es
+        del día completo y el arqueo es de una sola persona, así que el papel
+        no cuadraría. Cada quien puede imprimir el suyo desde su pantalla.
       </div>
 
       <div class="row g-3 mb-4">
@@ -278,6 +356,13 @@
               class="form-control"
               placeholder="0.00"
               [(ngModel)]="conteoFisico" />
+
+            <!-- Sin esto, el botón se pone gris y nadie sabe por qué. -->
+            <div class="form-text text-danger"
+                 *ngIf="conteoFisico !== null && conteoFisico < 0">
+              El dinero contado no puede ser negativo: es lo que hay
+              físicamente en el cajón.
+            </div>
           </div>
           <div class="col-md-4">
             <div class="text-muted small">Efectivo esperado</div>
@@ -310,6 +395,13 @@
           <div class="form-text">Captura el dinero contado para poder cerrar el día.</div>
         </div>
 
+        <div class="mt-3" *ngIf="sinMovimientos() && !esJefe">
+          <div class="form-text">
+            No hay movimientos tuyos por cortar este día, así que no hay corte
+            que entregar.
+          </div>
+        </div>
+
         <div class="d-flex justify-content-end mt-3">
           <button
             class="btn btn-dark px-4 fw-semibold"
@@ -340,7 +432,7 @@
           </div>
           <div class="col-md-3">
             <div class="text-muted small">Estado</div>
-            <span class="badge fs-6" [ngClass]="estaAutorizado() ? 'bg-success' : 'bg-warning text-dark'">
+            <span class="badge fs-6" [ngClass]="claseEstado(cierreGuardado.estado)">
               {{ cierreGuardado.estado }}
             </span>
           </div>

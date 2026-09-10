@@ -1,0 +1,133 @@
+/* ============================================================
+   CALENDARIO DE CORTES
+   La cuadrícula del mes con el semáforo de cada día.
+   ============================================================ */
+
+/* Siete columnas iguales: lunes a domingo, como el calendario de pared. */
+.calendario-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.calendario-encabezado {
+  text-align: center;
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #6c757d;
+  padding: 4px 0;
+}
+
+.calendario-celda {
+  aspect-ratio: 1 / 1;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+  user-select: none;
+}
+
+.calendario-celda:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.celda-numero {
+  font-weight: 700;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+/* autorizados / entregados */
+.celda-conteo {
+  font-size: 0.75rem;
+  font-weight: 600;
+  opacity: 0.85;
+  text-align: right;
+}
+
+/* ---------- Los colores del semáforo ----------
+   Los decide el SERVIDOR; aquí solo se pintan.
+   Se usan tonos suaves con texto oscuro: un calendario lleno de
+   colores saturados cansa la vista y no deja leer los números. */
+
+.dia-verde {
+  background-color: #d1e7dd;
+  border-color: #a3cfbb;
+  color: #0f5132;
+}
+
+.dia-amarillo {
+  background-color: #fff3cd;
+  border-color: #ffe69c;
+  color: #664d03;
+}
+
+.dia-rojo {
+  background-color: #f8d7da;
+  border-color: #f1aeb5;
+  color: #842029;
+}
+
+/* Sin cortes ese día. */
+.dia-gris {
+  background-color: #f8f9fa;
+  color: #adb5bd;
+}
+
+/* Domingo sin cortes: un poco más apagado, solo como referencia visual.
+   NO quiere decir "no se trabaja": aquí sí se trabaja en domingo y en
+   festivo. Es nada más para ubicar el fin de semana de un vistazo. */
+.dia-domingo {
+  background-color: #f1f3f5;
+  border-style: dashed;
+}
+
+/* Hueco de relleno antes del día 1. No es un día: ni se ve ni se pica. */
+.dia-hueco {
+  border: none;
+  background: transparent;
+  cursor: default;
+}
+
+.dia-hueco:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+/* El día de hoy, con marco grueso para encontrarlo rápido. */
+.dia-hoy {
+  border-width: 2px;
+  border-color: #212529;
+}
+
+/* Los cuadritos de la leyenda de abajo. */
+.muestra {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1px solid #dee2e6;
+}
+
+/* En celular las celdas cuadradas quedan diminutas: se dejan más bajas
+   que anchas para que el número siga siendo legible. */
+@media (max-width: 576px) {
+  .calendario-celda {
+    aspect-ratio: auto;
+    min-height: 52px;
+    padding: 4px;
+  }
+
+  .celda-numero {
+    font-size: 0.9rem;
+  }
+
+  .celda-conteo {
+    font-size: 0.65rem;
+  }
+}

@@ -1,0 +1,86 @@
+<div class="calendario-page">
+
+  <div class="card shadow-sm p-4">
+
+    <div class="mb-4">
+      <h2 class="fw-bold mb-1">Calendario de cortes</h2>
+      <p class="text-muted small mb-0">
+        El mes de un vistazo. Pica un día para revisarlo en Cierre de Caja.
+      </p>
+    </div>
+
+    <!-- Navegación del mes -->
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-4">
+      <button class="btn btn-outline-dark" (click)="mesAnterior()">‹ Anterior</button>
+      <h4 class="fw-bold mb-0 mx-2">{{ tituloDelMes() }}</h4>
+      <button class="btn btn-outline-dark" (click)="mesSiguiente()">Siguiente ›</button>
+      <button class="btn btn-outline-secondary ms-2" (click)="irAlMesActual()">Mes actual</button>
+    </div>
+
+    <div class="alert alert-danger py-2 small" *ngIf="error">
+      {{ error }}
+    </div>
+
+    <div *ngIf="cargando" class="text-center py-4 text-muted">
+      Cargando calendario...
+    </div>
+
+    <div *ngIf="!cargando">
+
+      <!-- Encabezado de columnas -->
+      <div class="calendario-grid mb-1">
+        <div class="calendario-encabezado" *ngFor="let d of nombresDias">{{ d }}</div>
+      </div>
+
+      <!-- Los días -->
+      <div class="calendario-grid">
+        <div
+          *ngFor="let dia of dias"
+          class="calendario-celda"
+          [ngClass]="claseDelDia(dia)"
+          [class.dia-hoy]="dia.esHoy"
+          [attr.title]="dia.fecha ? tituloDelDia(dia) : null"
+          (click)="abrirDia(dia)">
+
+          <ng-container *ngIf="dia.fecha">
+            <div class="celda-numero">{{ dia.numero }}</div>
+            <div class="celda-conteo" *ngIf="dia.totalCortes > 0">
+              {{ dia.autorizados }}/{{ dia.totalCortes }}
+            </div>
+          </ng-container>
+        </div>
+      </div>
+
+      <!-- Qué significa cada color -->
+      <div class="d-flex flex-wrap gap-3 mt-4 small">
+        <div class="d-flex align-items-center gap-2">
+          <span class="muestra dia-verde"></span>
+          Revisado ({{ contarColor('VERDE') }})
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="muestra dia-amarillo"></span>
+          Incompleto ({{ contarColor('AMARILLO') }})
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="muestra dia-rojo"></span>
+          Sin revisar ({{ contarColor('ROJO') }})
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="muestra dia-gris"></span>
+          Sin cortes
+        </div>
+      </div>
+
+      <div class="text-muted small mt-3">
+        El número de cada día es <strong>autorizados / entregados</strong>.
+        Un día gris quiere decir que no se entregó ningún corte: puede ser
+        que no se trabajó, o que nadie lo entregó — el sistema no lleva
+        registro de quién trabaja cada día, así que no distingue entre las
+        dos cosas.
+      </div>
+
+    </div>
+
+  </div>
+
+</div>

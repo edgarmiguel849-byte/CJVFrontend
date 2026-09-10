@@ -25,6 +25,27 @@ export class CierreCaja {
     return this.http.get<any>(`${this.apiUrl}/mi-corte`, { params });
   }
 
+  /**
+   * MI corte YA ENTREGADO de ese día, con sus cifras congeladas: usuario,
+   * efectivo esperado, efectivo contado, diferencia y comentarios.
+   *
+   * Es lo que la pantalla necesita para pintar el panel de "ya entregado"
+   * y la hoja impresa. Sin esto, al recargar el panel sale vacío y el
+   * papel sale sin cifras.
+   *
+   * Cuando todavía no entrego, el servidor responde 204 y Angular lo
+   * convierte en null. NO necesita catchError: no haber entregado no es
+   * un error. Ojo: el tipo any se traga ese null, así que quien lo use
+   * tiene que preguntar por él a mano.
+   *
+   * Un corte REABIERTO tampoco cuenta como entregado: también llega null,
+   * porque la pantalla debe volver al modo de captura.
+   */
+  miCorteEntregado(fecha: string): Observable<any> {
+    const params = new HttpParams().set('fecha', fecha);
+    return this.http.get<any>(`${this.apiUrl}/mi-corte-entregado`, { params });
+  }
+
   /** ¿Ya entregué mi corte de ese día? */
   yaEntregue(fecha: string): Observable<boolean> {
     const params = new HttpParams().set('fecha', fecha);
@@ -39,6 +60,33 @@ export class CierreCaja {
   listarDelDia(fecha: string): Observable<any[]> {
     const params = new HttpParams().set('fecha', fecha);
     return this.http.get<any[]>(`${this.apiUrl}/del-dia`, { params });
+  }
+
+  /**
+   * EL SEMÁFORO DEL MES para el calendario del Jefe.
+   *
+   * Devuelve un renglón por cada día que TENGA cortes:
+   *   { fecha, color, totalCortes, autorizados, hayReabiertos }
+   *
+   * Los colores los decide el servidor, no esta pantalla:
+   *   VERDE    -> todos los cortes de ese día están autorizados.
+   *   AMARILLO -> unos sí y otros no, o hay alguno reabierto.
+   *   ROJO     -> hay cortes y ninguno autorizado.
+   *
+   * OJO: los días SIN ningún corte no vienen en la lista. El calendario
+   * los pinta grises por ausencia; así no viaja un mes entero de
+   * renglones vacíos. Un domingo y un martes en que nadie entregó se ven
+   * igual, porque el sistema no sabe quién trabajó cada día.
+   *
+   * El mes va de 1 a 12, como lo dice la gente — NO de 0 a 11 como el
+   * objeto Date de JavaScript. Quien llame desde un Date tiene que
+   * sumarle 1 al getMonth().
+   */
+  estadosDelMes(anio: number, mes: number): Observable<any[]> {
+    const params = new HttpParams()
+      .set('anio', anio)
+      .set('mes', mes);
+    return this.http.get<any[]>(`${this.apiUrl}/estados-del-mes`, { params });
   }
 
   /**

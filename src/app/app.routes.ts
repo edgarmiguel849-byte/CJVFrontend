@@ -14,6 +14,7 @@ import { Comisiones } from './features/comisiones/pages/comisiones/comisiones';
 import { Egresos } from './features/egresos/pages/egresos/egresos';
 import { Entregas } from './features/entregas/pages/entregas/entregas';
 import { CierreCaja } from './features/cierre-caja/pages/cierre-caja/cierre-caja';
+import { CalendarioCortes } from './features/cierre-caja/pages/calendario-cortes/calendario-cortes';
 import { MainLayout } from './layout/main-layout/main-layout';
 import { authGuard } from './core/guards/auth-guard';
 
@@ -44,6 +45,13 @@ export const routes: Routes = [
       { path: 'reportes', component: Comisiones },
       { path: 'egresos', component: Egresos },
       { path: 'cierre-caja', component: CierreCaja },
+
+      // Calendario de supervisión: el mes con sus semáforos. Es del Jefe
+      // (el endpoint que lo alimenta trae @PreAuthorize), pero aquí solo
+      // se pide sesión, igual que en /usuarios y /bitacora: quien entre
+      // sin ser Jefe verá la pantalla vacía, no los datos.
+      { path: 'cierre-caja/calendario', component: CalendarioCortes },
+
       { path: 'usuarios', component: Usuarios },
       { path: 'bitacora', component: BitacoraComponent }
     ]
@@ -57,3 +65,13 @@ export const routes: Routes = [
     redirectTo: ''
   }
 ];
+
+
+
+
+
+
+
+
+
+

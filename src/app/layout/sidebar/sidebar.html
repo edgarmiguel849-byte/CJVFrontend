@@ -32,7 +32,29 @@
         <li class="nav-item"><a class="nav-link text-white-50" routerLink="/pagos" routerLinkActive="active">Pagos</a></li>
         <li class="nav-item"><a class="nav-link text-white-50" routerLink="/egresos" routerLinkActive="active">Egresos</a></li>
         <li class="nav-item" *ngIf="esJefe"><a class="nav-link text-white-50" routerLink="/reportes" routerLinkActive="active">Reportes</a></li>
-        <li class="nav-item"><a class="nav-link text-white-50" routerLink="/cierre-caja" routerLinkActive="active">Cierre de caja</a></li>
+
+        <!-- exact: true porque /cierre-caja/calendario empieza igual que
+             /cierre-caja. Sin eso, estando en el calendario se marcarían
+             las dos ligas como activas. -->
+        <li class="nav-item">
+          <a class="nav-link text-white-50"
+             routerLink="/cierre-caja"
+             routerLinkActive="active"
+             [routerLinkActiveOptions]="{ exact: true }">
+            Cierre de caja
+          </a>
+        </li>
+
+        <!-- Solo el Jefe: es la vista de supervisión del mes. Los demás
+             no tienen nada que revisar aquí, y el endpoint que la
+             alimenta trae @PreAuthorize de todos modos. -->
+        <li class="nav-item" *ngIf="esJefe">
+          <a class="nav-link text-white-50"
+             routerLink="/cierre-caja/calendario"
+             routerLinkActive="active">
+            Calendario de cortes
+          </a>
+        </li>
       </ul>
     </li>
 
