@@ -15,11 +15,22 @@
       <div class="col-md-8 d-flex gap-2">
         <button class="btn btn-dark fw-semibold px-4" (click)="generar()">Generar</button>
         <button class="btn btn-outline-secondary" (click)="irHoy()">Hoy</button>
-        <button
+                <button
           class="btn btn-outline-dark d-flex align-items-center gap-2"
           *ngIf="puedeImprimir()"
+          [disabled]="imprimiendo"
           (click)="imprimir()">
-          <i class="fi fi-sr-print"></i> Imprimir
+          <i class="fi fi-sr-print"></i>
+          {{ imprimiendo ? 'Preparando...' : 'Imprimir' }}
+        </button>
+
+        <!-- La hoja de siempre: el día completo con todas las columnas y
+             sus comisiones. Solo el Jefe, y solo si ese día tiene algo. -->
+        <button
+          class="btn btn-dark d-flex align-items-center gap-2"
+          *ngIf="esJefe && corte && corte.renglones && corte.renglones.length > 0"
+          (click)="imprimirDiaCompleto()">
+          <i class="fi fi-sr-print"></i> Imprimir día completo
         </button>
       </div>
     </div>
@@ -81,12 +92,26 @@
                   <span class="badge" [ngClass]="claseEstado(c.estado)">{{ c.estado }}</span>
                 </td>
                 <td class="text-end">
-                  <button
-                    class="btn btn-sm"
-                    [ngClass]="esCorteSeleccionado(c) ? 'btn-dark' : 'btn-outline-dark'"
-                    (click)="seleccionarCorte(c)">
-                    {{ esCorteSeleccionado(c) ? 'Abierto' : 'Revisar' }}
-                  </button>
+                  <div class="d-flex gap-1 justify-content-end">
+                    <button
+                      class="btn btn-sm"
+                      [ngClass]="esCorteSeleccionado(c) ? 'btn-dark' : 'btn-outline-dark'"
+                      (click)="seleccionarCorte(c)">
+                      {{ esCorteSeleccionado(c) ? 'Abierto' : 'Revisar' }}
+                    </button>
+
+                    <!-- La hoja de ESE corte, con SUS movimientos. Un
+                         corte reabierto no se imprime: está devuelto para
+                         corregirse, no debe existir papel firmable de él. -->
+                    <button
+                      class="btn btn-sm btn-outline-secondary"
+                      *ngIf="c.estado !== 'REABIERTO'"
+                      [disabled]="imprimiendo"
+                      title="Imprimir la hoja de este corte"
+                      (click)="imprimirCorte(c)">
+                      <i class="fi fi-sr-print"></i>
+                    </button>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -98,7 +123,8 @@
         <div class="alert alert-info py-2 small mt-3 mb-0"
              *ngIf="hayVariosCortes() && !estaCerrado()">
           Hay {{ cortesDelDia.length }} cortes este día. Abre uno con
-          <strong>Revisar</strong> para ver su arqueo y autorizarlo.
+          <strong>Revisar</strong> para ver su arqueo y autorizarlo, o usa el
+          botón de impresora para sacar su hoja.
         </div>
       </div>
 
@@ -145,13 +171,22 @@
         </div>
       </div>
 
-      <!-- Por qué desaparece el botón Imprimir cuando hay varios cortes.
-           Sin este aviso parece que se descompuso el sistema. -->
-      <div class="alert alert-secondary py-2 small"
-           *ngIf="esJefe && hayVariosCortes() && estaCerrado()">
-        La hoja impresa de este día no está disponible: el detalle de abajo es
-        del día completo y el arqueo es de una sola persona, así que el papel
-        no cuadraría. Cada quien puede imprimir el suyo desde su pantalla.
+      <!-- ============================================================
+           CORTE ADICIONAL DEL MISMO DÍA — solo Administrador.
+           Cuando ya entregó uno y le quedaron movimientos nuevos, la
+           pantalla vuelve al modo de captura y el panel de arriba
+           desaparece. Sin este aviso parecería que el corte anterior se
+           perdió, o que está a punto de repetirlo.
+           ============================================================ -->
+      <div class="alert alert-info" *ngIf="esCorteAdicional()">
+        <strong>Este será otro corte de hoy</strong>
+        <div class="small mt-1">
+          Ya entregaste uno<span *ngIf="cierreGuardado.fechaHoraEntrega">
+            a las {{ cierreGuardado.fechaHoraEntrega | date:'HH:mm' }}</span>
+          por {{ cierreGuardado.efectivoContado | currency:'MXN':'symbol-narrow':'1.2-2' }}
+          ({{ cierreGuardado.estado }}). Ese no se toca: lo de abajo son solo
+          los movimientos que capturaste después.
+        </div>
       </div>
 
       <div class="row g-3 mb-4">
@@ -251,8 +286,8 @@
           <tfoot *ngIf="corte.renglones && corte.renglones.length > 0">
             <tr class="table-light fw-bold">
               <td colspan="5">Sumatoria</td>
-              <td class="text-end" *ngFor="let col of columnas()">
-                {{ col.montoCobrado | currency:'MXN':'symbol-narrow':'1.2-2' }}
+                            <td class="text-end" *ngFor="let col of columnas()">
+                {{ totalDeColumna(col) | currency:'MXN':'symbol-narrow':'1.2-2' }}
               </td>
               <td class="text-end" *ngIf="hayCortesias()" style="color: #b8860b;">
                 {{ totalCortesias() | currency:'MXN':'symbol-narrow':'1.2-2' }}
@@ -342,7 +377,12 @@
         </table>
       </div>
 
-      <h5 class="fw-bold mb-3">Arqueo físico</h5>
+      <h5 class="fw-bold mb-3">
+        Arqueo físico
+        <span class="badge bg-info text-dark ms-2" *ngIf="esCorteAdicional()">
+          Corte adicional
+        </span>
+      </h5>
 
       <div class="border rounded p-3 mb-3" *ngIf="!estaCerrado()">
         <div class="row g-3 align-items-end">
@@ -454,19 +494,201 @@
 
   <!-- ============================================================
        HOJA DE IMPRESIÓN
-       No se ve en pantalla. Solo aparece al mandar imprimir.
+       No se ve en pantalla. Solo existe mientras se imprime.
+
+       Lee corteImpreso / cierreImpreso, NO lo que está en pantalla.
+       Antes leía this.corte, y por eso la hoja de un corte salía con
+       los movimientos del día completo contra el arqueo de una sola
+       persona: un papel firmable que no cuadraba.
+
+       NO LLEVA BLOQUE DE COMISIONES: la comisión es de la VENDEDORA de
+       la O.T. y esta hoja es de quien RECIBIÓ el dinero. Son personas
+       distintas. Las comisiones viven en Reportes, que es del Jefe y ve
+       el día completo.
        ============================================================ -->
-  <div class="hoja-impresion" *ngIf="corte && estaCerrado()">
+  <div class="hoja-impresion" *ngIf="corteImpreso && cierreImpreso">
 
     <div class="hoja-titulo">
       <div class="hoja-marca">Reporte de Caja</div>
     </div>
 
-    <div class="hoja-fecha">{{ fechaLarga() }}</div>
+    <div class="hoja-fecha">
+      {{ fechaLarga(cierreImpreso.fechaCierre) }}
+      · {{ cierreImpreso.usuario?.nombreUsuario }}
+      <span *ngIf="cierreImpreso.fechaHoraEntrega">
+        · {{ cierreImpreso.fechaHoraEntrega | date:'HH:mm' }}
+      </span>
+    </div>
 
-    <div class="hoja-pendiente" *ngIf="estaEnviado()">
+    <div class="hoja-pendiente" *ngIf="cierreImpreso.estado === 'ENVIADO'">
       PENDIENTE DE AUTORIZAR
     </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 8%;">CONTRATO</th>
+          <th style="width: 8%;">RECIBO</th>
+          <th style="width: 12%;">MODALIDAD</th>
+          <th style="width: 24%;">NOMBRE</th>
+          <th style="width: 20%;">ESCUELA</th>
+          <th class="num" *ngFor="let col of columnas(corteImpreso)">{{ col.nombre | uppercase }}</th>
+          <th class="num" *ngIf="hayCortesias(corteImpreso)">CORTESÍA</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let r of corteImpreso.renglones" [class.fila-cancelada]="r.cancelado">
+          <td>{{ r.folioContrato || '' }}</td>
+          <td>{{ r.folioRecibo || '' }}</td>
+          <td style="font-weight: 600;"
+              [style.color]="r.esDevolucion ? '#c0392b' : (r.esCortesia ? '#b8860b' : (r.esEfectivo ? '#1a7f37' : '#0b5ed7'))">
+            {{ r.modalidad }}<span *ngIf="r.esDevolucion"> · Devolución</span>
+          </td>
+          <td>{{ r.nombre }}</td>
+          <td>{{ r.escuela }}</td>
+          <td class="num" *ngFor="let col of columnas(corteImpreso)">
+            <span *ngIf="montoEnColumna(r, col) !== null">
+              {{ montoEnColumna(r, col) | number:'1.2-2' }}
+              <span *ngIf="!r.esEfectivo"> *</span>
+            </span>
+          </td>
+          <td class="num" *ngIf="hayCortesias(corteImpreso)">
+            <span *ngIf="montoCortesia(r) !== null">
+              {{ montoCortesia(r) | number:'1.2-2' }}
+            </span>
+          </td>
+        </tr>
+
+        <tr *ngIf="!corteImpreso.renglones || corteImpreso.renglones.length === 0">
+          <td [attr.colspan]="5 + columnas(corteImpreso).length + (hayCortesias(corteImpreso) ? 1 : 0)">
+            Este corte no trae movimientos que mostrar.
+          </td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr class="fila-total">
+          <td colspan="5">SUMATORIA</td>
+                   <td class="num" *ngFor="let col of columnas(corteImpreso)">
+            {{ totalDeColumna(col, corteImpreso) | number:'1.2-2' }}
+          </td>
+          <td class="num" *ngIf="hayCortesias(corteImpreso)">
+            {{ totalCortesias(corteImpreso) | number:'1.2-2' }}
+          </td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <div style="font-size: 8pt; margin-top: -2mm;">
+      * Cobrado por transferencia, tarjeta o depósito (no entró efectivo a la caja).
+    </div>
+
+    <div class="hoja-bloques">
+
+      <div class="hoja-bloque">
+        <h6> TABLA DE EGRESOS</h6>
+        <table>
+          <tbody>
+            <tr *ngFor="let egreso of corteImpreso.egresos">
+              <td>
+                {{ egreso.concepto }}
+              </td>
+              <td class="num" style="width: 25%; color: #c0392b;">{{ egreso.monto | number:'1.2-2' }}</td>
+            </tr>
+            <tr *ngIf="!corteImpreso.egresos || corteImpreso.egresos.length === 0">
+              <td colspan="2">Sin egresos en este corte.</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="fila-total">
+              <td>TOTAL DE EGRESOS</td>
+              <td class="num" style="color: #c0392b;">{{ totalEgresos(corteImpreso) | number:'1.2-2' }}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div class="hoja-bloque">
+        <h6>RESUMEN</h6>
+        <table>
+          <tbody>
+            <tr>
+              <td>Ingresos</td>
+              <td class="num" style="width: 35%;">{{ totalIngresos(corteImpreso) | number:'1.2-2' }}</td>
+            </tr>
+            <tr>
+              <td>Efectivo</td>
+              <td class="num">{{ totalEfectivo(corteImpreso) | number:'1.2-2' }}</td>
+            </tr>
+            <tr>
+              <td>Números rojos (Transferencias)</td>
+              <td class="num">{{ totalNoEfectivo(corteImpreso) | number:'1.2-2' }}</td>
+            </tr>
+            <tr *ngIf="hayCortesias(corteImpreso)">
+              <td>Cortesías otorgadas</td>
+              <td class="num">{{ totalCortesias(corteImpreso) | number:'1.2-2' }}</td>
+            </tr>
+            <tr>
+              <td>Egresos</td>
+              <td class="num">– {{ totalEgresos(corteImpreso) | number:'1.2-2' }}</td>
+            </tr>
+            <tr class="fila-total">
+              <td>EFECTIVO A ENTREGAR</td>
+              <td class="num">{{ cierreImpreso.efectivoEsperado | number:'1.2-2' }}</td>
+            </tr>
+            <tr>
+              <td>Dinero en caja</td>
+              <td class="num">{{ cierreImpreso.efectivoContado | number:'1.2-2' }}</td>
+            </tr>
+            <tr class="fila-total">
+              <td>DIFERENCIA</td>
+              <td class="num">{{ cierreImpreso.diferencia | number:'1.2-2' }}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div *ngIf="cierreImpreso.comentarios" style="font-size: 8pt; margin-top: 1mm;">
+          <strong>Observación:</strong> {{ cierreImpreso.comentarios }}
+        </div>
+      </div>
+
+    </div>
+
+    <div class="hoja-firmas">
+      <div class="hoja-firma">
+        <div class="hoja-firma-linea">ENTREGA</div>
+        <div class="hoja-firma-nombre">{{ cierreImpreso.usuario?.nombreUsuario }}</div>
+      </div>
+      <div class="hoja-firma" *ngIf="cierreImpreso.estado === 'AUTORIZADO'">
+        <div class="hoja-firma-linea">RECIBÍ</div>
+        <div class="hoja-firma-nombre">{{ cierreImpreso.usuarioAutoriza?.nombreUsuario }}</div>
+      </div>
+    </div>
+
+    </div>
+
+  <!-- ============================================================
+       HOJA DEL DÍA COMPLETO — solo el Jefe.
+
+       Es el papel de siempre: los movimientos de TODOS con sus columnas
+       por destinatario, y el bloque de COMISIONES cuadrando al 10%.
+
+       Aquí las comisiones SÍ van, al revés que en la hoja de un corte:
+       esta tiene el día entero, así que el porcentaje de cada vendedora
+       sale sobre todo lo que vendió y no partido entre cortes.
+
+       OJO CON EL PIE: los movimientos son del día completo, pero los
+       arqueos son solo de los cortes ENTREGADOS. Si alguien capturó algo
+       y no lo ha entregado, ese dinero sale arriba pero no en la suma de
+       abajo. Por eso el renglón "sin cortar": sin él, la resta quedaría
+       sin explicación y parecería un descuadre.
+       ============================================================ -->
+  <div class="hoja-impresion" *ngIf="imprimiendoDia && corte">
+
+    <div class="hoja-titulo">
+      <div class="hoja-marca">Control de contratos y recibos de oficina</div>
+    </div>
+
+    <div class="hoja-fecha">{{ fechaLarga() }}</div>
 
     <table>
       <thead>
@@ -507,7 +729,7 @@
         <tr class="fila-total">
           <td colspan="5">SUMATORIA</td>
           <td class="num" *ngFor="let col of columnas()">
-            {{ col.montoCobrado | number:'1.2-2' }}
+            {{ totalDeColumna(col) | number:'1.2-2' }}
           </td>
           <td class="num" *ngIf="hayCortesias()">
             {{ totalCortesias() | number:'1.2-2' }}
@@ -523,13 +745,11 @@
     <div class="hoja-bloques">
 
       <div class="hoja-bloque">
-        <h6> TABLA DE EGRESOS</h6>
+        <h6>TABLA DE EGRESOS</h6>
         <table>
           <tbody>
             <tr *ngFor="let egreso of corte.egresos">
-              <td>
-                {{ egreso.concepto }}
-              </td>
+              <td>{{ egreso.concepto }}</td>
               <td class="num" style="width: 25%; color: #c0392b;">{{ egreso.monto | number:'1.2-2' }}</td>
             </tr>
             <tr *ngIf="!corte.egresos || corte.egresos.length === 0">
@@ -588,23 +808,36 @@
               <td>Egresos</td>
               <td class="num">– {{ totalEgresos() | number:'1.2-2' }}</td>
             </tr>
+
             <tr class="fila-total">
-              <td>EFECTIVO A ENTREGAR</td>
-              <td class="num">{{ cierreGuardado.efectivoEsperado | number:'1.2-2' }}</td>
+              <td>ESPERADO EN LOS CORTES ({{ cortesEntregados() }})</td>
+              <td class="num">{{ totalEsperadoDelDia() | number:'1.2-2' }}</td>
             </tr>
             <tr>
-              <td>Dinero en caja</td>
-              <td class="num">{{ cierreGuardado.efectivoContado | number:'1.2-2' }}</td>
+              <td>Dinero contado</td>
+              <td class="num">{{ totalContadoDelDia() | number:'1.2-2' }}</td>
             </tr>
             <tr class="fila-total">
               <td>DIFERENCIA</td>
-              <td class="num">{{ cierreGuardado.diferencia | number:'1.2-2' }}</td>
+              <td class="num">{{ totalDiferenciaDelDia() | number:'1.2-2' }}</td>
+            </tr>
+
+            <!-- Dinero capturado que todavía no viaja en ningún corte.
+                 Sin este renglón la resta de arriba no cuadraría contra
+                 el efectivo del día y parecería un error. -->
+            <tr *ngIf="hayEfectivoSinCortar()">
+              <td style="color: #c0392b;">Efectivo aún sin cortar</td>
+              <td class="num" style="color: #c0392b;">
+                {{ efectivoSinCortar() | number:'1.2-2' }}
+              </td>
             </tr>
           </tbody>
         </table>
 
-        <div *ngIf="cierreGuardado.comentarios" style="font-size: 8pt; margin-top: 1mm;">
-          <strong>Observación:</strong> {{ cierreGuardado.comentarios }}
+        <div *ngIf="hayEfectivoSinCortar()" style="font-size: 8pt; margin-top: 1mm;">
+          Hay movimientos de este día que todavía no se han entregado en
+          ningún corte. Por eso la suma de los arqueos es menor que el
+          efectivo del día.
         </div>
       </div>
 
@@ -612,12 +845,8 @@
 
     <div class="hoja-firmas">
       <div class="hoja-firma">
-        <div class="hoja-firma-linea">ENTREGA</div>
-        <div class="hoja-firma-nombre">{{ cierreGuardado.usuario?.nombreUsuario }}</div>
-      </div>
-      <div class="hoja-firma" *ngIf="estaAutorizado()">
-        <div class="hoja-firma-linea">RECIBÍ</div>
-        <div class="hoja-firma-nombre">{{ cierreGuardado.usuarioAutoriza?.nombreUsuario }}</div>
+        <div class="hoja-firma-linea">REVISÓ</div>
+        <div class="hoja-firma-nombre">&nbsp;</div>
       </div>
     </div>
 

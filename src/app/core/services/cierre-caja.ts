@@ -46,6 +46,26 @@ export class CierreCaja {
     return this.http.get<any>(`${this.apiUrl}/mi-corte-entregado`, { params });
   }
 
+  /**
+   * EL DETALLE DE UN CORTE YA ENTREGADO: los movimientos que ESE corte se
+   * llevó, con sus folios, alumnos y montos.
+   *
+   * Es lo que necesita la hoja impresa para que cada quien imprima lo
+   * suyo. Sin esto, el papel salía con los movimientos del día completo
+   * contra el arqueo de una sola persona: un documento firmable que no
+   * cuadra.
+   *
+   * Devuelve la misma forma que miCorte(), así que el HTML de impresión
+   * lo pinta sin cambios.
+   *
+   * OJO: un corte REABIERTO NO se puede imprimir — el servidor responde
+   * 400 con su mensaje. Está devuelto para corregirse, así que no debe
+   * existir un papel firmable de él.
+   */
+  detalleDelCorte(idCierre: number): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/${idCierre}/detalle`);
+  }
+
   /** ¿Ya entregué mi corte de ese día? */
   yaEntregue(fecha: string): Observable<boolean> {
     const params = new HttpParams().set('fecha', fecha);

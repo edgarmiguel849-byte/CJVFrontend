@@ -21,20 +21,50 @@ export class CierreCaja implements OnInit {
 
   /**
    * SOLO JEFE: todos los cortes del día, cada uno con su dueño y su estado.
-   *
-   * Un día puede traer el de Tete entregado y dos del Administrador. Antes
-   * se pedía buscarPorFecha(), que devolvía EL PRIMERO: el Jefe autorizaba
-   * el de Tete creyendo que revisaba el del Administrador.
    */
   cortesDelDia: any[] = [];
 
-  // OJO: esto es cortina, no chapa. El backend es quien manda; esto solo
-  // decide qué se pinta. Alguien puede cambiarlo en DevTools y no le sirve
-  // de nada, porque los endpoints del Jefe traen @PreAuthorize.
+  /**
+   * LO QUE SE VA A IMPRIMIR, y solo eso.
+   *
+   *   corteImpreso  -> los movimientos que ESE corte se llevó.
+   *   cierreImpreso -> su acta: quién firma, esperado, contado, diferencia.
+   *
+   * Viven aparte de corte/cierreGuardado a propósito. Antes la hoja se
+   * armaba con lo que la pantalla tuviera puesto, y por eso el papel de
+   * un corte salía con los movimientos del día completo contra el arqueo
+   * de una sola persona. Ahora la hoja se llena SOLO al momento de
+   * imprimir, con lo que devuelve el servidor para ese corte.
+   */
+  corteImpreso: any = null;
+  cierreImpreso: any = null;
+
+  /**
+   * LA HOJA DEL DÍA COMPLETO. Solo el Jefe.
+   *
+   * Es el equivalente del papel de siempre: los movimientos de TODOS con
+   * las columnas por destinatario y el bloque de comisiones cuadrando al
+   * 10%. Aquí las comisiones SÍ van, al revés que en la hoja individual:
+   * esta hoja tiene el día entero, así que el porcentaje de cada
+   * vendedora sale sobre todo lo que vendió y no partido entre cortes.
+   *
+   * Se arma con lo que el Jefe ya tiene en pantalla, así que NO necesita
+   * pedirle nada al servidor.
+   */
+  imprimiendoDia = false;
+
+  // OJO: esto es cortina, no chapa. El backend es quien manda.
   esJefe: boolean = localStorage.getItem('rolUsuario') === 'Jefe';
+
+  /**
+   * El Administrador entrega los cortes que necesite en un mismo día, por
+   * el volumen de folios. Es el ÚNICO rol que puede.
+   */
+  esAdministrador: boolean = localStorage.getItem('rolUsuario') === 'Administrador';
 
   cargando = false;
   guardando = false;
+  imprimiendo = false;
   error = '';
   yaConsulto = false;
 
@@ -68,9 +98,7 @@ export class CierreCaja implements OnInit {
    *
    * NO se usa toISOString(): esa función convierte a UTC, y en Veracruz
    * (UTC-6) eso adelanta la fecha un día a partir de las 6 de la tarde.
-   * O sea que al cerrar la caja en la noche, la pantalla abría en el día
-   * siguiente. En un corte de caja eso no es un detalle: es cortar el
-   * día equivocado.
+   * En un corte de caja eso no es un detalle: es cortar el día equivocado.
    */
   private hoy(): string {
     const d = new Date();
@@ -87,12 +115,8 @@ export class CierreCaja implements OnInit {
   /**
    * Arma la pantalla. Hay dos caminos, y no son el mismo:
    *
-   *  - JEFE: ve el día COMPLETO de todos (el reporte de siempre). Él no
-   *    entrega corte, revisa los de los demás.
-   *
-   *  - MOSTRADOR y ADMINISTRADOR: ven SU corte — lo que ellos capturaron
-   *    ese día y que todavía no viaja en ningún corte entregado. Es lo
-   *    que van a contar y firmar.
+   *  - JEFE: ve el día COMPLETO de todos. Él no entrega corte, revisa.
+   *  - MOSTRADOR y ADMINISTRADOR: ven SU corte pendiente de entregar.
    */
   generar() {
     if (!this.fecha) {
@@ -105,6 +129,9 @@ export class CierreCaja implements OnInit {
     this.corte = null;
     this.cierreGuardado = null;
     this.cortesDelDia = [];
+    this.corteImpreso = null;
+    this.cierreImpreso = null;
+    this.imprimiendoDia = false;
     this.conteoFisico = null;
     this.comentarioCierre = '';
 
@@ -134,16 +161,8 @@ export class CierreCaja implements OnInit {
   /**
    * ¿Ya se entregó, y con qué números?
    *
-   * Para el Jefe la pregunta es del día y en plural: TODOS los cortes que
-   * se entregaron, para que él escoja cuál revisa. Para los demás la
-   * pregunta es SUYA: "¿yo ya entregué el mío?". Que Adri haya entregado
-   * no le tapa la pantalla a Tete.
-   *
-   * Ya no se usa yaEntregue() aquí. Ese endpoint solo contesta sí/no, y
-   * con un sí no hay de dónde sacar las cifras del acta. Además, tener
-   * dos endpoints contestando la misma pregunta abre la puerta a que se
-   * contradigan (uno cuenta REABIERTO como entregado y el otro no).
-   * Un solo origen de verdad: miCorteEntregado().
+   * Para el Jefe la pregunta es del día y en plural. Para los demás la
+   * pregunta es SUYA. Un solo origen de verdad: miCorteEntregado().
    */
   consultarCierreGuardado() {
     if (this.esJefe) {
@@ -151,10 +170,9 @@ export class CierreCaja implements OnInit {
         next: (lista) => {
           this.cortesDelDia = lista ?? [];
 
-          // Con UN solo corte se selecciona solo: el día normal se ve
-          // igual que siempre. Con VARIOS no se elige ninguno a propósito
-          // — que el Jefe diga cuál revisa. Escoger por él es exactamente
-          // el bug que tenía buscarPorFecha().
+          // Con UN solo corte se selecciona solo. Con VARIOS no se elige
+          // ninguno a propósito: escoger por el Jefe es el bug que tenía
+          // buscarPorFecha().
           this.cierreGuardado =
             this.cortesDelDia.length === 1 ? this.cortesDelDia[0] : null;
 
@@ -169,16 +187,9 @@ export class CierreCaja implements OnInit {
       return;
     }
 
-    // MI corte ya entregado, con sus cifras congeladas: usuario, efectivo
-    // esperado, contado, diferencia y comentarios. Es lo que necesitan el
-    // panel de "ya entregado" y la hoja impresa.
-    //
-    // Si todavía no entrego, el servidor responde 204 y aquí llega null:
-    // la pantalla se queda en modo de captura. No haber entregado no es
-    // un error, por eso el null se trata como caso normal.
-    //
-    // Un corte REABIERTO también llega como null, a propósito: está
-    // devuelto para corregirse, así que hay que poder volver a capturar.
+    // Si todavía no entrego, el servidor responde 204 y aquí llega null.
+    // No haber entregado no es un error. Un corte REABIERTO también llega
+    // null: está devuelto para corregirse, hay que poder volver a capturar.
     this.cierreService.miCorteEntregado(this.fecha).subscribe({
       next: (data) => {
         this.cierreGuardado = data ?? null;
@@ -214,9 +225,6 @@ export class CierreCaja implements OnInit {
   /**
    * Vuelve a pedir la lista después de autorizar, reabrir o eliminar, y
    * deja abierto el mismo corte que el Jefe traía (si sigue existiendo).
-   *
-   * Sin esto, el renglón de la tabla se queda con el estado viejo aunque
-   * el panel de arriba ya diga AUTORIZADO.
    */
   private refrescarCortesDelDia(idSeleccionado: number | null) {
     if (!this.esJefe) {
@@ -240,8 +248,32 @@ export class CierreCaja implements OnInit {
 
   // ---------- Estados de la pantalla ----------
 
+  /**
+   * ¿Modo "ya entregué" (panel) o modo captura (formulario)?
+   *
+   * Tener un corte entregado NO basta para cerrar la pantalla: el
+   * Administrador entrega a media jornada y sigue cobrando. Si al volver
+   * tiene movimientos nuevos, necesita capturar el SIGUIENTE corte.
+   *
+   * Para el Mostrador no cambia nada: entrega uno al día.
+   */
   estaCerrado(): boolean {
-    return this.cierreGuardado !== null;
+    if (this.cierreGuardado === null) {
+      return false;
+    }
+    if (this.esAdministrador && !this.sinMovimientos()) {
+      return false;
+    }
+    return true;
+  }
+
+  /** ¿Este sería un corte ADICIONAL del mismo día? */
+  esCorteAdicional(): boolean {
+    return (
+      this.cierreGuardado !== null &&
+      this.esAdministrador &&
+      !this.sinMovimientos()
+    );
   }
 
   estaAutorizado(): boolean {
@@ -266,15 +298,12 @@ export class CierreCaja implements OnInit {
 
   // ---------- Acciones ----------
 
-  /** True cuando la caja no cuadra (y por tanto el comentario es obligatorio). */
   hayDiferencia(): boolean {
     const dif = this.diferencia();
     return dif !== null && Math.abs(dif) >= 0.01;
   }
 
   puedeEnviar(): boolean {
-    // El Jefe no entrega corte: revisa y autoriza los de los demás.
-    // El backend también lo rechaza; esto solo evita el viaje.
     if (this.esJefe) {
       return false;
     }
@@ -284,11 +313,9 @@ export class CierreCaja implements OnInit {
     if (this.conteoFisico === null || this.conteoFisico < 0) {
       return false;
     }
-    // Si no cuadra, el comentario es obligatorio.
     if (this.hayDiferencia() && !this.comentarioCierre.trim()) {
       return false;
     }
-    // No tiene caso entregar un corte sin un solo movimiento.
     if (this.sinMovimientos()) {
       return false;
     }
@@ -312,9 +339,16 @@ export class CierreCaja implements OnInit {
     }
 
     const dif = this.diferencia();
-    const mensaje = this.hayDiferencia() && dif !== null
-      ? `Tu caja no cuadra por $${Math.abs(dif).toFixed(2)}. ¿Entregar el corte de todos modos?`
-      : '¿Entregar tu corte de este día? Después solo el jefe puede reabrirlo.';
+
+    let mensaje: string;
+    if (this.hayDiferencia() && dif !== null) {
+      mensaje = `Tu caja no cuadra por $${Math.abs(dif).toFixed(2)}. ¿Entregar el corte de todos modos?`;
+    } else if (this.esCorteAdicional()) {
+      mensaje = '¿Entregar otro corte de este día con los movimientos nuevos? '
+        + 'El corte anterior no se toca.';
+    } else {
+      mensaje = '¿Entregar tu corte de este día? Después solo el jefe puede reabrirlo.';
+    }
 
     if (!confirm(mensaje)) {
       return;
@@ -330,14 +364,6 @@ export class CierreCaja implements OnInit {
           this.guardando = false;
           this.cierreGuardado = data;
           this.cdr.detectChanges();
-          // Se vuelve a pedir el corte: ya entregado, lo que se llevó queda
-          // marcado y el cálculo debe salir en ceros. Sin esto, la pantalla
-          // seguiría enseñando movimientos que ya se fueron.
-          //
-          // OJO: generar() limpia cierreGuardado y lo vuelve a pedir con
-          // miCorteEntregado(), así que el acta que se acaba de guardar
-          // regresa sola. La asignación de arriba es solo para que el panel
-          // no parpadee mientras viaja la petición.
           this.generar();
         },
         error: (err) => {
@@ -423,8 +449,6 @@ export class CierreCaja implements OnInit {
         this.cierreGuardado = null;
         this.conteoFisico = null;
         this.comentarioCierre = '';
-        // El corte ya no existe: la lista tiene que enterarse, y no hay
-        // nada que dejar seleccionado.
         this.refrescarCortesDelDia(null);
         this.cdr.detectChanges();
       },
@@ -439,6 +463,12 @@ export class CierreCaja implements OnInit {
   }
 
   // ---------- La hoja del corte ----------
+  //
+  // Todos estos reciben una FUENTE opcional. Sin argumento leen lo que
+  // está en pantalla (this.corte); con argumento leen el corte impreso.
+  // Así el papel y la pantalla usan las mismas funciones sin que el papel
+  // tenga que mirar lo que la pantalla trae puesto — que era exactamente
+  // el bug: la hoja de un corte salía con los movimientos del día entero.
 
   esOficina(fila: any): boolean {
     return fila?.idUsuario === null || fila?.idUsuario === undefined;
@@ -447,17 +477,17 @@ export class CierreCaja implements OnInit {
   /**
    * Las columnas del papel: una por cada destinatario con movimiento.
    *
-   * El Jefe las saca del reporte de comisiones, como siempre. En el corte
-   * personal no hay comisiones a propósito (son de la VENDEDORA, no de
-   * quien recibió el dinero), así que las columnas se deducen de los
-   * propios renglones: los destinatarios distintos que aparezcan.
+   * El Jefe las saca del reporte de comisiones. En un corte personal no
+   * hay comisiones a propósito, así que se deducen de los renglones.
    */
-  columnas(): any[] {
-    if (this.corte?.ingresos?.filas) {
-      return this.corte.ingresos.filas;
+  columnas(fuente?: any): any[] {
+    const c = fuente ?? this.corte;
+
+    if (c?.ingresos?.filas) {
+      return c.ingresos.filas;
     }
 
-    const renglones: any[] = this.corte?.renglones || [];
+    const renglones: any[] = c?.renglones || [];
     const vistos = new Map<any, any>();
 
     for (const r of renglones) {
@@ -490,18 +520,45 @@ export class CierreCaja implements OnInit {
     return mismoDestinatario ? renglon.monto : null;
   }
 
-  // ¿Hubo cortesías? Si no, la columna ni se dibuja.
-  hayCortesias(): boolean {
-    return this.totalCortesias() > 0;
+  /**
+   * El total de UNA columna: lo que se le cobró a ese destinatario.
+   *
+   * En el reporte del Jefe el total viene calculado en la fila
+   * (montoCobrado). En un corte personal NO: ahí las columnas se deducen
+   * de los renglones y no traen total, así que hay que sumarlos.
+   *
+   * Sin esto, la fila SUMATORIA salía en blanco en la pantalla del
+   * Mostrador y en el papel de cada corte: una hoja de dinero con la
+   * suma vacía.
+   */
+  totalDeColumna(columna: any, fuente?: any): number {
+    // El reporte del Jefe ya lo trae hecho; no hay que recalcularlo.
+    if (columna?.montoCobrado !== null && columna?.montoCobrado !== undefined) {
+      return Number(columna.montoCobrado);
+    }
+
+    const c = fuente ?? this.corte;
+    const renglones: any[] = c?.renglones || [];
+
+    let suma = 0;
+    for (const r of renglones) {
+      const monto = this.montoEnColumna(r, columna);
+      if (monto !== null) {
+        suma += Number(monto);
+      }
+    }
+    return suma;
   }
 
-  totalCortesias(): number {
-    return Number(
-      this.corte?.totalCortesias ?? this.corte?.ingresos?.totalCortesias ?? 0
-    );
+  hayCortesias(fuente?: any): boolean {
+    return this.totalCortesias(fuente) > 0;
   }
 
-  // El monto solo se dibuja en la columna de Cortesías si el renglón lo es.
+  totalCortesias(fuente?: any): number {
+    const c = fuente ?? this.corte;
+    return Number(c?.totalCortesias ?? c?.ingresos?.totalCortesias ?? 0);
+  }
+
   montoCortesia(renglon: any): number | null {
     return renglon?.esCortesia ? renglon.monto : null;
   }
@@ -509,81 +566,190 @@ export class CierreCaja implements OnInit {
   // ---------- Impresión ----------
 
   /**
-   * Solo se puede imprimir un corte ya entregado. Si los números todavía
-   * se pueden mover, no debe existir una hoja firmable de ellos.
+   * ¿Se puede imprimir lo que está abierto?
    *
-   * BLOQUEO PARA EL JEFE CON VARIOS CORTES: la hoja mezcla dos fuentes.
-   * El detalle sale de this.corte (el día COMPLETO, de todos) y el bloque
-   * de resumen sale de cierreGuardado (de UNA persona). Con un corte al
-   * día las dos cosas coinciden. Con dos, el papel enseñaría todos los
-   * movimientos del día contra el arqueo de una sola: un documento
-   * firmable que no cuadra. Mejor no imprimir que imprimir mentiras.
-   *
-   * PENDIENTE: hoy el papel del Mostrador sale con el encabezado y las
-   * cifras del acta correctos, pero SIN el detalle de movimientos. Los
-   * renglones salen de this.corte, que después de entregar viene vacío a
-   * propósito (lo que ya viajó en un corte no se vuelve a listar). Para
-   * reconstruirlo hace falta un endpoint que lea cierre_caja_detalle del
-   * corte entregado. Ese mismo endpoint resuelve el bloqueo de arriba.
+   * Un corte REABIERTO no se imprime: está devuelto para corregirse, así
+   * que no debe existir un papel firmable de él. El servidor también lo
+   * rechaza; esto solo evita el viaje.
    */
   puedeImprimir(): boolean {
-    if (!this.estaCerrado()) {
-      return false;
-    }
-    if (this.esJefe && this.hayVariosCortes()) {
-      return false;
-    }
-    return true;
+    return this.estaCerrado() && !this.estaReabierto();
   }
 
+  /** El botón de arriba: imprime el corte que está abierto. */
   imprimir() {
     if (!this.puedeImprimir()) {
       return;
     }
-    window.print();
+    this.imprimirCorte(this.cierreGuardado);
+  }
+
+  /**
+   * IMPRIME UN CORTE, el que sea.
+   *
+   * Pide al servidor los movimientos que ESE corte se llevó, arma la hoja
+   * con ellos y manda a la impresora. La pantalla no cambia: la hoja vive
+   * en un bloque aparte que solo se ve al imprimir.
+   */
+  imprimirCorte(cierre: any) {
+    if (!cierre?.idCierreCaja || this.imprimiendo) {
+      return;
+    }
+    if (cierre.estado === 'REABIERTO') {
+      this.error = 'Ese corte está reabierto para corregirse. '
+        + 'No se puede imprimir hasta que lo reenvíen.';
+      this.cdr.detectChanges();
+      return;
+    }
+
+    this.imprimiendo = true;
+    this.error = '';
+
+    this.cierreService.detalleDelCorte(cierre.idCierreCaja).subscribe({
+      next: (detalle) => {
+        this.corteImpreso = detalle;
+        this.cierreImpreso = cierre;
+        this.imprimiendoDia = false;   // por si venía prendida
+        this.imprimiendo = false;
+
+        // Hay que dejar que Angular dibuje la hoja ANTES de llamar a
+        // print(); si no, el navegador imprime la página sin ella.
+        this.cdr.detectChanges();
+
+        setTimeout(() => {
+          window.print();
+
+          // Ya impreso, se limpia: si la hoja se queda cargada, la
+          // siguiente impresión podría salir con el corte anterior.
+          this.corteImpreso = null;
+          this.cierreImpreso = null;
+          this.cdr.detectChanges();
+        }, 150);
+      },
+      error: (err) => {
+        this.imprimiendo = false;
+        this.error = err.error && typeof err.error === 'string'
+          ? err.error
+          : 'No se pudo preparar la hoja de ese corte.';
+        this.cdr.detectChanges();
+      },
+    });
+  }
+
+  /**
+   * IMPRIME LA HOJA DEL DÍA COMPLETO. Solo el Jefe.
+   *
+   * No pide nada al servidor: usa lo que ya está en pantalla, que es el
+   * reporte del día entero con todas las columnas y sus comisiones. Es el
+   * equivalente del papel de siempre.
+   */
+  imprimirDiaCompleto() {
+    if (!this.esJefe || !this.corte) {
+      return;
+    }
+
+    // Las dos hojas comparten el mismo espacio: si quedara prendida la
+    // individual, saldrían las dos en el mismo papel.
+    this.corteImpreso = null;
+    this.cierreImpreso = null;
+    this.imprimiendoDia = true;
+    this.cdr.detectChanges();
+
+    setTimeout(() => {
+      window.print();
+      this.imprimiendoDia = false;
+      this.cdr.detectChanges();
+    }, 150);
+  }
+
+  // ---------- El pie de la hoja del día ----------
+
+  /** Cuántos cortes se entregaron ese día. */
+  cortesEntregados(): number {
+    return this.cortesDelDia.length;
+  }
+
+  /** La suma de lo que el sistema esperaba en los cajones. */
+  totalEsperadoDelDia(): number {
+    return this.cortesDelDia.reduce(
+      (suma, c) => suma + Number(c?.efectivoEsperado ?? 0), 0);
+  }
+
+  /** La suma de lo que se contó físicamente. */
+  totalContadoDelDia(): number {
+    return this.cortesDelDia.reduce(
+      (suma, c) => suma + Number(c?.efectivoContado ?? 0), 0);
+  }
+
+  /** contado - esperado, sumando todos los cortes. */
+  totalDiferenciaDelDia(): number {
+    return this.totalContadoDelDia() - this.totalEsperadoDelDia();
+  }
+
+  /**
+   * EFECTIVO QUE TODAVÍA NADIE HA ENTREGADO.
+   *
+   * El efectivo del día menos los egresos da lo que debería haber salido
+   * de los cajones. Si los cortes entregados suman menos que eso, la
+   * diferencia es dinero capturado que aún no viaja en ningún corte.
+   *
+   * Existe porque la hoja mezcla dos fuentes: los movimientos son del día
+   * completo y los arqueos son solo de lo entregado. Sin este renglón, el
+   * papel tendría una resta sin explicación y parecería un descuadre.
+   */
+  efectivoSinCortar(): number {
+    const esperadoDelDia = this.totalEfectivo() - this.totalEgresos();
+    return esperadoDelDia - this.totalEsperadoDelDia();
+  }
+
+  hayEfectivoSinCortar(): boolean {
+    return Math.abs(this.efectivoSinCortar()) >= 0.01;
   }
 
   // ---------- Totales ----------
-  // Cada uno lee primero el campo del corte personal y, si no está, cae
-  // al del reporte del Jefe. Así los dos caminos usan las mismas funciones
-  // y el HTML no se entera de cuál está viendo.
+  // Igual que las columnas: sin argumento leen la pantalla, con argumento
+  // leen el corte impreso. Cada uno prueba primero el campo del corte
+  // personal y cae al del reporte del Jefe.
 
-  totalEgresos(): number {
-    return Number(this.corte?.totalEgresos ?? 0);
+  totalEgresos(fuente?: any): number {
+    const c = fuente ?? this.corte;
+    return Number(c?.totalEgresos ?? 0);
   }
 
-  totalEfectivo(): number {
-    return Number(
-      this.corte?.totalEfectivo ?? this.corte?.ingresos?.totalEfectivo ?? 0
-    );
+  totalEfectivo(fuente?: any): number {
+    const c = fuente ?? this.corte;
+    return Number(c?.totalEfectivo ?? c?.ingresos?.totalEfectivo ?? 0);
   }
 
-  totalNoEfectivo(): number {
-    return Number(
-      this.corte?.totalNoEfectivo ?? this.corte?.ingresos?.totalNoEfectivo ?? 0
-    );
+  totalNoEfectivo(fuente?: any): number {
+    const c = fuente ?? this.corte;
+    return Number(c?.totalNoEfectivo ?? c?.ingresos?.totalNoEfectivo ?? 0);
   }
 
-  totalIngresos(): number {
-    return Number(
-      this.corte?.totalIngresos ?? this.corte?.ingresos?.totalCobrado ?? 0
-    );
+  totalIngresos(fuente?: any): number {
+    const c = fuente ?? this.corte;
+    return Number(c?.totalIngresos ?? c?.ingresos?.totalCobrado ?? 0);
   }
 
   /**
    * SOLO tiene valor para el Jefe. En un corte personal devuelve 0 a
    * propósito: la comisión es de la VENDEDORA de la O.T., y esta hoja es
-   * de quien RECIBIÓ el dinero. Son personas distintas, y mezclarlas le
-   * atribuiría a alguien dinero que no es suyo.
+   * de quien RECIBIÓ el dinero. Son personas distintas.
+   *
+   * Por eso el bloque de COMISIONES no va en la hoja de un corte
+   * individual, pero SÍ en la del día completo: ahí el porcentaje sale
+   * sobre todo lo que vendió cada quien, no partido entre cortes.
    */
-  totalComisiones(): number {
-    return Number(this.corte?.ingresos?.totalComisiones ?? 0);
+  totalComisiones(fuente?: any): number {
+    const c = fuente ?? this.corte;
+    return Number(c?.ingresos?.totalComisiones ?? 0);
   }
 
-  /** Fecha del corte para el encabezado impreso. */
-  fechaLarga(): string {
-    if (!this.fecha) return '';
-    const [anio, mes, dia] = this.fecha.split('-');
+  /** Fecha en dd/mm/aaaa. Sin argumento usa la de la pantalla. */
+  fechaLarga(fechaIso?: string): string {
+    const f = fechaIso ?? this.fecha;
+    if (!f) return '';
+    const [anio, mes, dia] = f.split('-');
     return `${dia}/${mes}/${anio}`;
   }
 
